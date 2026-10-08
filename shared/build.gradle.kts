@@ -93,13 +93,10 @@ sqldelight {
     }
 }
 
-compose.desktop { /* desktop 暂不启用，留作未来扩展 */ }
-
-// 让 Android 端也能看到 Compose 编译器生成的代码
 kotlin {
     compilerOptions {
-        // allow experimental APIs
         freeCompilerArgs.add("-opt-in=androidx.compose.ui.ExperimentalComposeUiApi")
         freeCompilerArgs.add("-opt-in=androidx.compose.foundation.ExperimentalFoundationApi")
+        freeCompilerArgs.add("-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi")
     }
 }
