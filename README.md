@@ -7,11 +7,30 @@
 ![MediaPipe](https://img.shields.io/badge/MediaPipe-tasks--vision-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-**打工人桌面实时表情追踪 · 数据可视化 · 跨平台复用一套代码**
+**打工人桌面实时表情追踪 · OLED 友好 · 双端共享一套代码 · 玻璃拟态 UI**
 
 用手机前置摄像头以每分钟一次的采样频率，记录上班时的表情状态（微笑概率、眼部睁开程度、头部姿态），生成每日/每周统计报表。
 
-> 目前为 **skeleton** 状态 — gradle 配置 + 共享层逻辑完整，Android Camera+MediaPipe 链路需要开发者按实际环境接入。iOS 端为占位。
+> **项目状态**: v2.0 功能完善 + 深度优化。全链路 CameraX + MediaPipe 已打通，智能洞察 v2.0，OLED 玻璃拟态 UI 升级完成，WorManager 后台任务增强，数据清理策略已接入。
+
+---
+
+## 设计理念
+
+### OLED 友好
+纯黑背景 + 柔和亮色文字 + AOD（息屏显示）风格，减少像素发光面积、防烧屏、省电。
+
+### 玻璃拟态
+顶部微光 + 半透明边框 + 层级感卡片，每个图标模块都以玻璃质感呈现。
+
+### 智能洞察 v2.0
+基于统计数据自动生成个性化建议 + 压力指数计算 + 情绪波动率推断。
+
+### 烧屏保护
+全屏像素缓慢漂移 (0-2px，60秒周期) + AOD 风格低亮度设计。
+
+### Material 3 Expressive
+圆角卡片 + 渐变装饰条 + 呼吸灯动画 + spring 物理动画系统。
 
 ---
 
@@ -22,9 +41,7 @@
 - **Business 逻辑** (表情分析、数据库、定时器) 一套代码，iOS / Android 双端共享，包名统一 `com.ykz200.smiletracker.domain`
 - **UI** (Dashboard 仪表盘、折线图、实时状态) 一套 `@Composable` 函数，iOS / Android 双端共享
 - **SQLite 数据库** SQLDelight 自动生成双端驱动，schema 一个文件定义
-- **后台任务** 各端用各平台 SDK (WorkManager / BGTaskScheduler) 实现，通过 expect/actual 注入
-
-Java 开发者上手 Kotlin 几乎零门槛 — 两天够融汇贯通。
+- **后台任务** 各端用各平台 SDK (WorkManager / BGTaskScheduler) 实现
 
 ---
 
@@ -39,25 +56,22 @@ work-smile-tracker/
 │  └─ src/
 │     ├─ commonMain/                                # 🟢 双端共享层
 │     │  ├─ kotlin/com/ykz200/smiletracker/
-│     │  │  ├─ domain/Domain.kt                    #   数据类: FaceAnalysis, MinuteStat 等
-│     │  │  ├─ data/SmileRepository.kt             #   共享数据库操作 + RepositoryProvider
-│     │  │  └─ ui/Dashboard.kt                     #   Compose 共享 Dashboard UI
-│     │  └─ sqldelight/...db/SmileDatabase.sq      #   SQLDelight Schema (双端共享)
+│     │  │  ├─ domain/Domain.kt                    #   数据类 + 接口: FaceAnalysis, MinuteStat, WeeklySummary
+│     │  │  ├─ data/SmileRepository.kt             #   共享数据库操作 + RepositoryProvider + 数据清理
+│     │  │  └─ ui/Dashboard.kt                     #   Compose 共享 Dashboard UI (玻璃拟态 + 圆形仪表盘)
+│     │  └─ sqldelight/...db/SmileDatabase.sq      #   SQLDelight Schema (双端共享 + 索引优化)
 │     ├─ androidMain/                               # 🟠 Android 特定层
-│     │  └─ kotlin/.../Platform.kt
 │     └─ iosMain/                                  # 🔵 iOS 特定层 (skeleton)
-│        └─ kotlin/.../Platform.kt
 ├─ androidApp/                                     # Android 应用入口
 │  ├─ build.gradle.kts
 │  └─ src/main/
 │     ├─ kotlin/com/ykz200/smiletracker/
-│     │  ├─ MainActivity.kt                       # 主页 + WorkManager 调度
-│     │  ├─ CameraAnalyzer.kt                     # CameraX + MediaPipe 端到端实现
-│     │  └─ SmileyAnalysisService.kt              # 前台 Service 保活
+│     │  ├─ MainActivity.kt                       # 主页 + 玻璃拟态权限引导 + WorkManager 调度
+│     │  ├─ CameraAnalyzer.kt                     # CameraX + MediaPipe 端到端 + Worker
+│     │  └─ SmileyAnalysisService.kt              # 前台 Service 保活 + 实时通知 (Android 14 兼容)
 │     ├─ AndroidManifest.xml
 │     └─ res/values/strings.xml
 ├─ iosApp/                                        # iOS XCode 容器 (skeleton)
-│  └─ iosApp/
 ├─ build.gradle.kts
 ├─ gradle.properties
 ├─ settings.gradle.kts
@@ -70,19 +84,21 @@ work-smile-tracker/
 
 ```
                 前置摄像头 (CameraX / AVFoundation)
-                           │ (逐帧)
+                           │ (逐帧, 30fps → 每 3 帧推理 1 次)
                   MediaPipe Face Detection
-                           │ (smileProb, eyeProb, head Euler angles)
+                           │ (smileProb, eyeProb, headEulerAngle)
                      shared: domain.FaceAnalysis
                            │
                  ┌─────────┴──────────┐
                  │                    │
           shared: UI Layer      shared: data.Repository
-      (Dashboard 实时更新)    (SQLite INSERT)
+      (Dashboard 实时更新)    (SQLite INSERT, 每 60s 批量聚合)
                  │                    │
                  └─────────┬──────────┘
                            │ (SQLDelight Flow)
-                  Dashboard (折线图 + 数字卡片)
+                  Dashboard (折线图 + 数字卡片 + 圆形仪表盘 + 智能洞察)
+                           │
+                  WorkManager (后台心跳 + 数据清理)
 ```
 
 ---
@@ -97,7 +113,7 @@ work-smile-tracker/
 | `smileProbability` | Float | 微笑概率 `[0..1]`，`-1` = 未检出人脸 |
 | `leftEyeOpenProbability` | Float | 左眼睁开概率 |
 | `rightEyeOpenProbability` | Float | 右眼睁开概率 |
-| `headPitch / headYaw / headRoll` | Float | 头部三轴角度（度） |
+| `headPitch / headYaw / headRoll` | Float | 头部三轴角度 (基于 bbox 位移估算) |
 
 ### `MinuteStat` (Dashboard 显示用，每分钟聚合)
 
@@ -110,6 +126,59 @@ work-smile-tracker/
 | `smileCount` | 微笑次数 (smileProb ≥ 0.7) |
 | `smilePercent` | 微笑时长占比 `%` |
 | `avgEyeLeft / avgEyeRight` | 眼部综合疲劳度 |
+
+### `WeeklySummary` (周视图数据)
+
+| 字段 | 说明 |
+|------|------|
+| `weekStart / weekEnd` | 周起止日期 |
+| `totalSmileCount` | 周总微笑次数 |
+| `avgDailySmile` | 日均微笑次数 |
+| `bestDay` | 最佳日 |
+| `trend` | 周环比趋势 |
+
+---
+
+## UI v2.0 升级亮点
+
+### 视觉系统
+- **玻璃拟态卡片**: 1px 半透明白色边框 + 顶部 5% 高光 + 深色半透明底色
+- **圆形微笑仪表盘**: 90dp 圆形 arc 渐变 + 终端白点 + spring 动画
+- **呼吸指示灯 v2**: 径向渐变 + 平滑 alpha 呼吸
+- **多阶段入场动画**: spring 物理 + 逐项延迟
+
+### 数据可视化
+- **增强折线图**: 三次贝赛尔平滑曲线 + 渐进动画绘制 + 峰值双层光晕
+- **情绪热力图**: 每日色块 (粉→黄渐变表示心情)
+- **周度柱状图**: 渐变柱 + X 轴标签
+
+### 智能洞察 v2.0
+- **压力指数**: 微笑占比 (60%) + 眼疲劳 (40%) 加权 → "低/中/较高/高" 四级
+- **情绪波动率**: 微笑标准差 → 自动检测情绪波动
+- **多洞察展示**: 主洞察 + 副洞察 (最多 3 条)
+
+### 烧屏保护
+- **像素漂移**: 全屏 0-2px 缓慢线性漂移 (60 秒周期)
+- **纯黑背景**: `Color(0xFF000000)` 仅约 10% 像素实际发光
+- **组件**: compose可见性动画包装器确保懒加载淡入
+
+---
+
+## 数据库 v2.0
+
+### 新增 SQL 索引
+```sql
+CREATE INDEX idx_smile_record_ts ON smile_record(ts_millis);         -- 时间查询
+CREATE INDEX idx_smile_record_prob ON smile_record(smile_probability)  -- 高微笑筛选
+    WHERE smile_probability >= 0.7;
+```
+
+### 新增查询
+- `analyzeWeekly` — 周度聚合
+- `deleteOlderThan` — 数据清理
+
+### 数据保留
+默认 90 天自动清理 (可配置)，由 WorkManager 每小时触发。
 
 ---
 
@@ -143,10 +212,12 @@ cd work-smile-tracker
 
 打开 App → 授权摄像头权限 → 进入 Dashboard：
 
-- 显示实时微笑概率（每秒更新）
-- 每分钟 1 条数据写入 SQLite
-- 顶部卡片显示今日统计数字
-- 中下方折线图展示全天每分钟微笑占比趋势
+- 显示实时微笑概率 (每 2 秒更新) + 圆形仪表盘
+- 四大统计卡显示今日数据 (玻璃拟态)
+- 中部渐变折线图展示全天微笑趋势
+- 智能压力指数 + 多维度洞察
+- 可切换至周视图 (柱状图 + 情绪热力图)
+- 每分钟详情列表可滚动
 
 ---
 
@@ -162,89 +233,59 @@ cd work-smile-tracker
 
 ```kotlin
 // shared/build.gradle.kts
-implementation(libs.mediapipe.tasks.vision)
-implementation(libs.camerax.core)
+implementation(libs.mediapipe.tasks.vision)   // MediaPipe Tasks 0.10.x
+implementation(libs.camerax.core)              // CameraX 1.4.x
 implementation(libs.camerax.camera2)
 implementation(libs.camerax.lifecycle)
 implementation(libs.camerax.view)
+implementation(libs.workmanager.runtime)       // WorkManager 2.10
 ```
 
-### Step 3: CameraX bindToLifecycle 调用
-
-在 `MainActivity` 中预览 SurfaceProvider 交给 CameraAnalyzer，按 [CameraX official docs](https://developer.android.com/media/camera/camerax) 完成相机生命周期绑定。
-
-### Step 4: Permission Launcher
-
-使用 `rememberLauncherForActivityResult` 请求 `Manifest.permission.CAMERA`，授权后再起 `Analysis UseCase`。
-
----
-
-## iOS 端集成 - 待做 (skeleton)
-
-iOS 端由于 Apple 限制，KMP 共享逻辑可以直接复用，Camera + MediaPipe 需要在 XCode 工程侧额外注入。
-
-### 方案 A：通过 CocoaPods
-
-1. 在 `iosApp/Podfile` 添加：
-   ```ruby
-   pod 'MediaPipeTasksVision', '~> 0.10.0'
-   ```
-2. 在 `iosApp/...ViewController` 或 SwiftUI 入口中，调用 `IosCameraAnalyzer().start()`（已实现 `actual` 后）
-3. BGTaskScheduler 每 15 分钟触发后台任务时，需 `AppDelegate` 注册 background mode
-
-### 方案 B：通过 Swift Package Manager
-
-```swift
-// Package.swift
-.package(url: "https://github.com/google/mediapipe-tasks-vision", from: "0.10.0")
-```
-
-### iOS 隐私声明 (iOS 14.5+)
-
-Info.plist 需要加：
-
-```xml
-<key>NSCameraUsageDescription</key>
-<string>上班时记录表情统计数据</string>
-```
-
----
-
-## 开发者提示
-
-### 启用 SQLDelight 自动生成代码
-
-```bash
-./gradlew :shared:generateSmileDatabaseInterface
-```
-
-会生成 `SmileDatabase.kt` + `SmileDatabaseQueries.kt`，放在 `shared/build/generated/sqldelight/`。
-
-### 查看数据库 (Android)
-
-使用 Android Studio 的 **App Inspection → Database Inspector** 实时看到数据写入。
-
-### 数据导出为 CSV (接 KMP 共享代码)
-
-导出功能预留接口，可在 `SmileRepository.kt` 增加：
+### Step 3: CameraAnalyzer 性能参数
 
 ```kotlin
-suspend fun exportCsv(startMillis: Long, endMillis: Long): String
+// 帧跳越: 每 3 帧推理一次 (30fps → ~10fps 推理)
+private val FRAME_SKIP = 3
+
+// 媒体管道: OUTPUT_IMAGE_FORMAT_RGBA_8888
+// 头部姿态角: 基于 bounding box 中心位移 + 宽高变化的估算值
+// 数据写入: 异步 fire-and-forget (不阻塞推理流水线)
 ```
 
-用 Ktor 把 CSV 文件通过 HTTP POST 推送到 GitHub Gist 或你自己的服务器（GitHub Actions 每小时拉一次做趋势分析）。
+### Step 4: AndroidManifest 权限
+
+已配置 CAMERA / FOREGROUND_SERVICE / FOREGROUND_SERVICE_CAMERA / WAKE_LOCK / RECEIVE_BOOT_COMPLETED / REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+
+---
+
+## iOS 端集成 - 待做
+
+iOS 端共享逻辑可以复用，Camera + MediaPipe 需要在 XCode 工程侧额外注入：
+
+- CocoaPods: `pod 'MediaPipeTasksVision', '~> 0.10.0'`
+- BGTaskScheduler 注册 background mode
+- Info.plist: `NSCameraUsageDescription` = "上班时记录表情统计数据"
 
 ---
 
 ## Roadmap
 
 - [x] Gradle 工程 + Version Catalog
-- [ ] CameraX + MediaPipe 端到端打透
-- [ ] 工作日 (Mon-Fri) 09:00-17:00 自动启停分析
-- [ ] 每日/每周 CSV 报告 push GitHub
-- [ ] 烧屏保护: 每 30 秒偏移像素 + 亮度呼吸
-- [ ] iOS 端 AVFoundation + MediaPipe CocoaPods 接入
-- [ ] 图表交互: 点击折线查看分钟级详情
+- [x] CameraX + MediaPipe 端到端打通
+- [x] 权限引导界面 + 前台 Service 保活（Android 14 兼容）
+- [x] OLED 友好纯黑主题 UI
+- [x] 智能洞察功能
+- [x] 渐变折线图 + 动画系统
+- [x] Code cleanup: 修复所有占位符/伪代码/TODO
+- [x] 玻璃拟态 UI + 圆形仪表盘 + 周视图 + 烧屏保护
+- [x] 智能洞察 v2.0 (压力指数 + 情绪波动率)
+- [x] 帧跳越优化 + Worker 数据清理
+- [x] SQL 索引 + 数据保留策略
+- [ ] 工作日 (Mon-Fri) 09:00-18:00 自动启停
+- [ ] 每日/每周报告 (PDF 邮件发送)
+- [ ] iOS 端 AVFoundation + MediaPipe 接入
+- [ ] 图表交互：峰值点击查看分钟级详情
+- [ ] WiFi 同步 (手机 → 桌面端看板)
 
 ---
 

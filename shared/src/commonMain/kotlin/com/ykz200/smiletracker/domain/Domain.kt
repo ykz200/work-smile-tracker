@@ -35,6 +35,42 @@ data class MinuteStat(
 )
 
 /**
+ * 每周汇总数据 — 周视图展示用
+ */
+data class WeeklySummary(
+    val weekStart: String,          // "2026-10-06"
+    val weekEnd: String,            // "2026-10-10"
+    val totalSmileCount: Int,       // 本周总微笑次数
+    val avgDailySmile: Float,       // 日均微笑次数
+    val bestDay: String,            // 最佳日 ("周三")
+    val bestDaySmileCount: Int,     // 最佳日微笑次数
+    val trend: String               // 趋势 ("+12%" 或 "-5%")
+)
+
+/**
+ * 单日情绪热力图数据
+ */
+data class DailyMoodHeatmap(
+    val dayLabel: String,           // "周一" / "周一 10-06"
+    val smileScore: Float,          // 微笑得分 [0..1]
+    val smileCount: Int             // 当日微笑总数
+)
+
+/**
+ * 每日摘要 — 数据查询更高效
+ */
+data class DailySummary(
+    val date: String,               // "2026-10-07"
+    val totalSamples: Int,
+    val smileCount: Int,
+    val avgSmileProbability: Float,
+    val peakSmileProbability: Float,
+    val peakTime: String,           // "15:30"
+    val eyeStrainIndex: Float,      // [0..100]
+    val stressLevel: String         // "低"/"中"/"高"
+)
+
+/**
  * 平台无关的抽象接口 — 由各端 (Android / iOS) 实现
  * 这是 KMP 的 expect/actual 模式 "顺手写" 版本, 用 interface + 注入更简单
  */
@@ -56,4 +92,6 @@ interface SmileRepository {
     suspend fun queryMinuteStats(startMillis: Long, endMillis: Long): List<MinuteStat>
     /** 获取最近一条采样 (用于 Dashboard 实时显示 "当前状态") */
     suspend fun getLatest(): FaceAnalysis?
+    /** 清理过期数据 (天为单位) — 可选实现, 默认空操作 */
+    fun cleanupOldData(retentionDays: Int = 90) = Unit
 }
