@@ -53,19 +53,20 @@ import kotlinx.coroutines.delay
 import java.util.concurrent.TimeUnit
 
 // ═══════════════════════════════════════════════════════════════
-// v4.0 色彩系统 — 深邃宇宙 + 暖阳薰紫
+// v5.0 色彩系统 — Liquid Glass 2.0 · 更精致的玻璃质感
 // ═══════════════════════════════════════════════════════════════
 
-private val DeepSpaceBg    = Color(0xFF050510)   // 深邃宇宙黑
-private val WarmGold       = Color(0xFFFFD480)   // 暖阳金
-private val LavenderPurple = Color(0xFFC4A8E8)   // 薰紫
-private val GlassCard      = Color(0xFF0D0D12).copy(alpha = 0.85f)  // 玻璃
-private val GlassBorder    = Color(0xFFFFD480).copy(alpha = 0.15f)  // 玻璃边框
-private val TextPrimary    = Color(0xFFF0F0F5)   // 主文字
-private val TextSecondary  = Color(0xFFA0A0B8)   // 次文字
-private val TextMuted      = Color(0xFF50506A)   // 弱化文字
-private val AccentPink     = Color(0xFFFF8FA3)   // 强调粉
-private val AccentCyan     = Color(0xFF6EE2E2)   // 流光青
+private val DeepSpaceBg     = Color(0xFF04040E)   // v5.0 更深邃
+private val WarmGold        = Color(0xFFFFD68A)   // v5.0 更柔和的暖金色
+private val LavenderPurple  = Color(0xFFCCB0EB)   // v5.0 更饱和的薰衣草
+private val GlassCard       = Color(0xFF0C0C14).copy(alpha = 0.88f)  // v5.0 更通透
+private val GlassBorder     = Color(0xFFFFD68A).copy(alpha = 0.18f)  // v5.0 更明显边框
+private val TextPrimary     = Color(0xFFF2F2FA)   // v5.0 更亮白
+private val TextSecondary   = Color(0xFFA8A8C0)   // v5.0 更柔和的次要文字
+private val TextMuted       = Color(0xFF555570)   // v5.0
+private val AccentPink      = Color(0xFFFF97A8)   // v5.0
+private val AccentCyan      = Color(0xFF7AE8E8)   // v5.0
+private val LiquidHighlight = Color.White.copy(alpha = 0.06f)  // v5.0 液态高光
 
 // ═══════════════════════════════════════════════════════════════
 // v4.0 应用状态机
@@ -316,40 +317,40 @@ private fun SplashScreenV4(onFinished: () -> Unit) {
     var showPrivacyCard by remember { mutableStateOf(false) }
     var startBreathing by remember { mutableStateOf(false) }
 
-    // 绘制进度 0→1 (微笑弧线从下到完整)
+    // v5.0: 更柔和的绘制进度
     val drawProgress by animateFloatAsState(
         targetValue = 1f,
-        animationSpec = tween(1200, easing = EaseOutCubic),
-        label = "splashDrawProgress"
+        animationSpec = tween(1400, easing = EaseOutQuart), // v5.0 更慢更柔
+        label = "splashDrawProgressV5"
     )
 
-    // 流光效果进度 (无限循环)
-    val flowProgress by rememberInfiniteTransition(label = "splashFlow").animateFloat(
+    // v5.0: 流光效果 — 更慢的速度
+    val flowProgress by rememberInfiniteTransition(label = "splashFlowV5").animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = LinearEasing),
+            animation = tween(2500, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "splashFlowProgress"
+        label = "splashFlowProgressV5"
     )
 
-    // 呼吸缩放动画 (Logo完成后触发)
-    val breatheScale by rememberInfiniteTransition(label = "splashBreathe").animateFloat(
+    // v5.0: 呼吸缩放 — 更柔和的振幅
+    val breatheScale by rememberInfiniteTransition(label = "splashBreatheV5").animateFloat(
         initialValue = 1f,
-        targetValue = 1.06f,
+        targetValue = 1.05f, // v5.0 更小振幅
         animationSpec = infiniteRepeatable(
-            animation = tween(1600, easing = EaseInOutSine),
+            animation = tween(2000, easing = EaseInOutSine), // v5.0 更慢
             repeatMode = RepeatMode.Reverse
         ),
-        label = "splashBreatheScale"
+        label = "splashBreatheScaleV5"
     )
 
-    // 卡片淡入
+    // v5.0: 卡片淡入 — 更平滑
     val cardAlpha by animateFloatAsState(
         targetValue = if (showPrivacyCard) 1f else 0f,
-        animationSpec = tween(500, easing = EaseOut),
-        label = "splashCardAlpha"
+        animationSpec = tween(600, easing = EaseOutQuart), // v5.0 使用更柔和的缓动
+        label = "splashCardAlphaV5"
     )
 
     val currentScale = if (startBreathing) breatheScale else 1f

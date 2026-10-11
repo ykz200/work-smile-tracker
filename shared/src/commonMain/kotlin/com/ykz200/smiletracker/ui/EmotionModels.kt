@@ -51,7 +51,7 @@ data class EmotionProbabilities(
         return listOf(
             Triple("微笑", smile, 0xFF4CAF50L),
             Triple("生气", angry, 0xFFE91E63L),
-            Triple("中性", neutral, 0xFF5C6BC0L),
+            Triple("中性", neutral, 0xFF5C6BCEL),
             Triple("思考", thinking, 0xFF7E57C2L),
             Triple("惊讶", surprise, 0xFFFFC107L),
             Triple("恐惧", fear, 0xFFFF5722L),
@@ -75,7 +75,7 @@ data class EmotionTrend(
 )
 
 // ═══════════════════════════════════════════════════════════════
-// v4.0 全新模型 — 连续追踪 + AI 建议 + 智能节律
+// v5.0 全新模型 — 连续追踪 + AI 建议 + 智能节律 + 社交分享
 // ═══════════════════════════════════════════════════════════════
 
 /**
@@ -105,22 +105,24 @@ data class EmotionSnapshot(
 )
 
 /**
- * v4.0 工作节奏分析结果 — 智能增强版
+ * v5.0 工作节奏分析结果 — 智能增强版 + 周期性洞察
  */
 data class WorkRhythm(
     val peakHour: Int?,             // 最开心的小时 (0-23)
     val troughHour: Int?,           // 最低谷的小时
     val avgMorningSmile: Float,     // 上午平均微笑
     val avgAfternoonSmile: Float,   // 下午平均微笑
-    val avgEveningSmile: Float,     // 晚间平均微笑 (v4.0新增)
+    val avgEveningSmile: Float,     // 晚间平均微笑
     val recommendation: String,     // 自动生成的建议
-    val focusScore: Int = 50,       // 专注度评分 (v4.0新增)
-    val burnoutRisk: String = "低",  // 倦怠风险 (v4.0新增)
-    val weekOverWeekChange: Float = 0f // 周同比变化 (v4.0新增)
+    val focusScore: Int = 50,       // 专注度评分
+    val burnoutRisk: String = "低",  // 倦怠风险
+    val weekOverWeekChange: Float = 0f, // 周同比变化
+    val bestConsecutiveHours: Int = 0,  // v5.0 最长连续积极时段(小时)
+    val flowStateFrequency: Float = 0f  // v5.0 心流状态频率
 )
 
 /**
- * v4.0 AI 智能建议
+ * v5.0 AI 智能建议 — 增加可执行度评分和分类
  */
 data class EmotionInsight(
     val id: String,
@@ -129,7 +131,8 @@ data class EmotionInsight(
     val description: String,
     val action: String?,            // 可执行建议
     val priority: Int,              // 1-5 (5最高)
-    val timestamp: Long
+    val timestamp: Long,
+    val actionableScore: Int = 0     // v5.0 可执行度 0-100
 )
 
 enum class InsightCategory {
@@ -137,18 +140,21 @@ enum class InsightCategory {
     PRODUCTIVITY,   // 效率建议
     SOCIAL,         // 社交提示
     REST,           // 休息提醒
-    EXERCISE        // 运动建议
+    EXERCISE,       // 运动建议
+    MINDFULNESS     // v5.0 正念提醒
 }
 
 /**
- * v4.0 心情连续追踪 — 时间序列上的心情变化
+ * v5.0 心情连续追踪 — 时间序列上的心情变化
  */
 data class MoodTimeline(
     val entries: List<MoodEntry>,
     val trendDirection: TrendDirection,
     val volatility: Float,          // 波动性 [0..1]
     val dominantMood: String,       // 主导心情
-    val avgIntensity: Float         // 平均强度
+    val avgIntensity: Float,        // 平均强度
+    val bestStreak: Int = 0,        // v5.0 最长连续积极天数
+    val weeklyPattern: String = ""  // v5.0 周模式总结
 )
 
 enum class TrendDirection {
@@ -159,7 +165,7 @@ enum class TrendDirection {
 }
 
 /**
- * v4.0 用眼健康报告
+ * v5.0 用眼健康报告 — 增加长期趋势和预测
  */
 data class EyeHealthReport(
     val totalScreenMinutes: Int,
@@ -167,17 +173,20 @@ data class EyeHealthReport(
     val strainScore: Int,              // 0-100
     val twentyTwentyTwentyCompliance: Float, // 20-20-20法则遵守率
     val recommendation: String,
-    val strainTrend: String = "稳定"    // "改善" / "稳定" / "恶化"
+    val strainTrend: String = "稳定",   // "改善" / "稳定" / "恶化"
+    val dryEyeRisk: String = "低",      // v5.0 干眼风险
+    val nextBreakDue: String = ""       // v5.0 下次休息时间建议
 )
 
 /**
- * v4.0 环境光检测结果
+ * v5.0 环境光检测结果
  */
 data class AmbientLightInfo(
     val luxLevel: Float,           // 光照强度 (lux)
     val quality: LightQuality,     // 光线质量
     val screenBrightnessSuggestion: Int, // 建议屏幕亮度 0-100
-    val eyeStrainRisk: String      // "低" / "中" / "高"
+    val eyeStrainRisk: String,     // "低" / "中" / "高"
+    val circadianPhase: String = "" // v5.0 昼夜节律时段
 )
 
 enum class LightQuality {
@@ -187,6 +196,31 @@ enum class LightQuality {
     DARK,       // <100
     HARSH       // 过强/直射
 }
+
+/**
+ * v5.0 每日摘要 — 用于分享和回顾
+ */
+data class DailySummary(
+    val date: String,
+    val totalSmiles: Int,
+    val peakEmotion: String,
+    val stressAverage: String,
+    val highlight: String,        // 今日亮点
+    val shareText: String,        // 分享文案
+    val rankPercentile: Int = 50  // 超过同周期用户的百分比
+)
+
+/**
+ * v5.0 长期趋势分析
+ */
+data class LongTermTrend(
+    val periodDays: Int,
+    val smileSlope: Float,          // 微笑趋势斜率
+    val consistencyScore: Int,      // 一致性评分 0-100
+    val topTrigger: String,         // 最常见的积极触发器
+    val growthAreas: List<String>,  // 建议改进的领域
+    val milestonesAchieved: List<String> // 达成的里程碑
+)
 
 /**
  * 辅助函数: 根据头部角度估算姿态
@@ -203,9 +237,9 @@ fun estimatePosture(pitch: Float, yaw: Float, roll: Float): String {
 }
 
 /**
- * v4.0: 根据智能节律数据生成个性化建议
+ * v5.0: 增强版智能建议生成器 — 多维度个性化
  */
-fun generateSmartRecommendation(rhythm:WorkRhythm): String {
+fun generateSmartRecommendation(rhythm: WorkRhythm): String {
     val parts = mutableListOf<String>()
     
     rhythm.peakHour?.let { hour ->
@@ -224,12 +258,22 @@ fun generateSmartRecommendation(rhythm:WorkRhythm): String {
     if (rhythm.focusScore > 70) {
         parts.add("专注度优秀!")
     }
+
+    // v5.0 新增：心流状态建议
+    if (rhythm.flowStateFrequency > 0.6f) {
+        parts.add("今天频繁进入心流状态，继续保持当前工作节奏")
+    }
+
+    // v5.0 新增：倦怠预警
+    if (rhythm.burnoutRisk == "高") {
+        parts.add("⚠️ 近期工作压力偏高，建议安排一次深度放松")
+    }
     
     return parts.joinToString("; ").ifEmpty { "继续保持观察, 积累更多数据中" }
 }
 
 /**
- * v4.0: 心情追踪辅助 — 从连续快照中分析波动性
+ * v5.0: 心情追踪辅助 — 从连续快照中分析波动性
  */
 fun analyzeVolatility(snapshots: List<EmotionSnapshot>): Float {
     if (snapshots.size < 2) return 0f
@@ -240,7 +284,7 @@ fun analyzeVolatility(snapshots: List<EmotionSnapshot>): Float {
 }
 
 /**
- * v4.0: 趋势方向判断
+ * v5.0: 趋势方向判断
  */
 fun determineTrend(snapshots: List<EmotionSnapshot>): TrendDirection {
     if (snapshots.size < 3) return TrendDirection.STABLE
@@ -255,4 +299,55 @@ fun determineTrend(snapshots: List<EmotionSnapshot>): TrendDirection {
         diff < -0.1f -> TrendDirection.DECLINING
         else -> TrendDirection.STABLE
     }
+}
+
+/**
+ * v5.0: 生成每日分享文案
+ */
+fun generateShareText(smileCount: Int, peakEmotion: String, streakDays: Int): String {
+    return when {
+        smileCount > 80 -> "今日微笑次数破百！保持好心情 😊 #SmileTracker 连续记录${streakDays}天"
+        smileCount > 40 -> "今天笑得不少！主打一个开心 😄 已坚持记录${streakDays}天"
+        smileCount > 15 -> "平平淡淡也是真～记录情绪第${streakDays}天 ✨"
+        else -> "心情需要调节的一天，明天会更好的 🌙 #自我关怀"
+    }
+}
+
+/**
+ * v5.0: 计算一致性评分 (数据越规律分越高)
+ */
+fun calculateConsistencyScore(snapshots: List<EmotionSnapshot>): Int {
+    if (snapshots.size < 5) return 50
+    val intervals = snapshots.zipWithNext { a, b -> kotlin.math.abs(b.timestamp - a.timestamp) }
+    val avgInterval = intervals.average()
+    val deviation = intervals.map { kotlin.math.abs(it - avgInterval) }.average()
+    val consistency = (1.0 - (deviation / (avgInterval + 1.0)).coerceIn(0.0, 1.0)) * 100
+    return consistency.toInt().coerceIn(0, 100)
+}
+
+/**
+ * v5.0: 检测心流状态 (连续长时间保持积极且稳定的情绪)
+ */
+fun detectFlowState(snapshots: List<EmotionSnapshot>, windowMinutes: Int = 30): Boolean {
+    if (snapshots.size < 10) return false
+    val recent = snapshots.takeLast(windowMinutes)
+    if (recent.size < 5) return false
+    val avgSmile = recent.map { it.smileProbability }.average()
+    val volatility = analyzeVolatility(recent)
+    return avgSmile > 0.5 && volatility < 0.15
+}
+
+/**
+ * v5.0: 生成长期趋势里程碑
+ */
+fun checkMilestones(totalDays: Int, totalSmiles: Int, currentStreak: Int): List<String> {
+    val milestones = mutableListOf<String>()
+    if (totalDays >= 7) milestones.add("坚持一周! 🎉")
+    if (totalDays >= 30) milestones.add("月度达人! 坚持30天 🏆")
+    if (totalDays >= 100) milestones.add("百日里程碑! 超强毅力 💯")
+    if (totalSmiles >= 100) milestones.add("累计微笑100次 😊")
+    if (totalSmiles >= 1000) milestones.add("千笑达人! 累计微笑1000次 🌟")
+    if (currentStreak >= 7) milestones.add("连续7天记录! 🔥")
+    if (currentStreak >= 30) milestones.add("连续30天! 习惯养成 💪")
+    return milestones
 }

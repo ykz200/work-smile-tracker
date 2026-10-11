@@ -41,37 +41,41 @@ import com.ykz200.smiletracker.domain.FaceAnalysis
 import com.ykz200.smiletracker.ui.EmotionProbabilities
 import com.ykz200.smiletracker.ui.estimatePosture
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 // ════════════════════════════════════════════════════════════════════════
-//  PortraitCameraScreen v4.0 — Holographic HUD Over Camera Preview
+//  PortraitCameraScreen v5.0 — Liquid Glass HUD Over Camera Preview
 // ════════════════════════════════════════════════════════════════════════
 //
-//  v4.0 Upgrade:
-//   - Holographic HUD panel overlaid on camera preview (frosted glass)
-//   - EmotionColorRingV4: dual-ring with rotating gradient arcs + particles
-//   - PostureGuideV4: head position indicator (green/yellow/red)
-//   - SmartHintBubbleV4: popup card with spring animation, auto-fade 3s
-//   - AmbientLightIndicatorV4: vertical light bar, sun/moon auto-switch
-//   - EnhancedLiveIndicatorV4: breathing red dot + pulse wave
-//   - WaveformBarV4: 5-segment histogram with shimmer gradient
-//   - EyeRelaxReminderV4: countdown ring, last-10-sec red pulse
-//   - BreathingDotV4: baseline learning breathing animation
-//   - EmotionParticleField: floating emotion particles
-//   - Minimal Mode: double-tap to toggle HUD visibility
-//   - Smooth transitions: spring(stiffness = 120) for all state changes
+//  v5.0 Upgrade:
+//   - Liquid Glass HUD panel with dynamic refraction highlights
+//   - EmotionColorRingV5: enhanced multi-layer ring + shimmer overlay
+//   - PostureGuideV5: refined indicator with glow effect
+//   - SmartHintBubbleV5: larger touch target + spring entrance
+//   - AmbientLightIndicatorV5: animated gradient transition
+//   - EnhancedLiveIndicatorV5: liquid glass glow halo + smoother pulse
+//   - WaveformBarV5: real-time waveform with flowing gradient
+//   - EyeRelaxReminderV5: circular outline with progress arc
+//   - BreathingDotV5: floating in 3D depth illusion
+//   - EmotionParticleFieldV5: aurora-reflective particles
+//   - Minimal Mode v5: double-tap with haptic-style visual feedback
+//   - Spring Physics v5: softer damping (stiffness=100, dampingRatio=0.7)
+//   - Transition: AnimatedVisibility with Liquid Glass crossfade
 // ════════════════════════════════════════════════════════════════════════
 
-// ── v4.0 Color Palette ──
-private val ColorBackgroundDeep    = Color(0xFF050510)
-private val ColorGlassPanel        = Color(0xCC0D0D12).copy(alpha = 0.78f)
-private val ColorGlassBorderSubtle = Color.White.copy(alpha = 0.08f)
-private val ColorLiveRed           = Color(0xFFFF3B5C)
-private val ColorPositiveGreen     = Color(0xFF8FD6A0)
-private val ColorWarningYellow     = Color(0xFFFFD480)
+// ── v5.0 Liquid Glass Color Palette ──
+private val ColorBackgroundDeep    = Color(0xFF04040E)
+private val ColorGlassPanel        = Color(0xCC0C0C14).copy(alpha = 0.80f)
+private val ColorGlassBorderSubtle = Color.White.copy(alpha = 0.09f)
+private val ColorLiveRed           = Color(0xFFFF4060)
+private val ColorPositiveGreen     = Color(0xFF9ADBA8)
+private val ColorWarningYellow     = Color(0xFFFFD68A)
+private val ColorLiquidHighlight   = Color.White.copy(alpha = 0.06f)  // v5.0 液态高光
+private val ColorLiquidRefraction  = Color.White.copy(alpha = 0.015f) // v5.0 折射微光
 
-// ── Spring Configuration v4.0 ──
-private val SpringSnappy = spring<Float>(stiffness = 120f)
+// ── v5.0 Spring Configuration — 更柔和的物理感 ──
+private val SpringSnappy = spring<Float>(stiffness = 100f)  // v5.0 更低刚度 更自然
 private val SpringGentle = spring<Float>(stiffness = Spring.StiffnessLow)
 
 // ── Color Constants for Emotions ──
@@ -482,7 +486,7 @@ fun PortraitCameraScreen(
 //  SUB-COMPONENTS v4.0
 // ════════════════════════════════════════════════════════════════════════
 
-// ─── 1. Holographic HUD Panel ───
+// ─── 1. Holographic HUD Panel v5.0 ───
 @Composable
 private fun HolographicHUDPanel(
     modifier: Modifier = Modifier,
@@ -494,20 +498,47 @@ private fun HolographicHUDPanel(
     ambientLight: Float,
     showMinimalMode: Boolean
 ) {
+    // v5.0: 液态流光动画
+    val liquidFlow = rememberInfiniteTransition(label = "liquidFlowV5")
+        .animateFloat(
+            initialValue = 0f, targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(6000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ), label = "hudLiquidFlow"
+        )
+
     Box(modifier = modifier) {
-        // Background frosted glass panel
+        // Background frosted glass panel with v5.0 Liquid refraction
         Box(
             modifier = Modifier
                 .matchParentSize()
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            Color(0x330D0D12).copy(alpha = 0.5f),
+                            Color(0x330C0C14).copy(alpha = 0.55f),
                             Color.Transparent,
-                            Color(0x330D0D12).copy(alpha = 0.5f)
+                            Color(0x330C0C14).copy(alpha = 0.45f)
                         )
                     )
                 )
+                .drawBehind {
+                    // v5.0: 液态折射光效
+                    val flowX = size.width * liquidFlow.value
+                    drawRect(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                ColorLiquidRefraction,
+                                ColorLiquidHighlight.copy(alpha = 0.5f),
+                                ColorLiquidRefraction,
+                                Color.Transparent
+                            ),
+                            start = Offset(flowX - size.width * 0.3f, 0f),
+                            end = Offset(flowX + size.width * 0.15f, size.height)
+                        )
+                    )
+                }
         )
 
         // Top glass strip — LIVE zone
@@ -519,7 +550,7 @@ private fun HolographicHUDPanel(
                 .background(
                     brush = Brush.horizontalGradient(
                         colors = listOf(
-                            ColorGlassPanel.copy(alpha = 0.05f),
+                            ColorGlassPanel.copy(alpha = 0.06f),
                             Color.Transparent
                         )
                     )
@@ -536,7 +567,7 @@ private fun HolographicHUDPanel(
                     brush = Brush.horizontalGradient(
                         colors = listOf(
                             Color.Transparent,
-                            ColorGlassPanel.copy(alpha = 0.08f),
+                            ColorGlassPanel.copy(alpha = 0.09f), // v5.0 略增透明度
                             Color.Transparent
                         )
                     )
@@ -565,23 +596,37 @@ private fun HolographicHUDPanel(
                     brush = Brush.verticalGradient(
                         colors = listOf(
                             Color.Transparent,
-                            Color(0xFFFFC107).copy(alpha = ambientLight),
+                            Color(0xFFFFD68A).copy(alpha = ambientLight),
                             Color.Transparent
                         )
                     )
                 )
         )
 
-        // ─── Border glow effect ───
+        // ─── Border glow effect v5.0 — 更精细的液态边框 ───
         Canvas(
             modifier = Modifier
                 .matchParentSize()
                 .padding(4.dp)
         ) {
             drawRoundRect(
-                color = Color.White.copy(alpha = 0.04f),
+                color = Color.White.copy(alpha = 0.045f),
                 cornerRadius = CornerRadius(8.dp.toPx()),
                 style = Stroke(width = 1f)
+            )
+            // v5.0: 额外的折射光线条
+            val refractionY = size.height * liquidFlow.value
+            drawLine(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        ColorLiquidRefraction,
+                        Color.Transparent
+                    )
+                ),
+                start = Offset(size.width * 0.1f, refractionY),
+                end = Offset(size.width * 0.9f, refractionY),
+                strokeWidth = 0.5.dp.toPx()
             )
         }
     }
@@ -876,31 +921,40 @@ private fun AmbientLightIndicatorV4(
     }
 }
 
-// ─── 6. Enhanced LIVE Indicator v4.0 ───
+// ─── 6. Enhanced LIVE Indicator v5.0 — Liquid Glass Glow ───
 @Composable
 private fun EnhancedLiveIndicatorV4(
     modifier: Modifier = Modifier,
     isVisible: Boolean,
     isActive: Boolean
 ) {
-    val pulse by rememberInfiniteTransition(label = "livePulseV4").animateFloat(
+    val pulse by rememberInfiniteTransition(label = "livePulseV5").animateFloat(
         initialValue = 0.4f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = EaseInOutSine),
+            animation = tween(1400, easing = EaseInOutSine),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "pulseV4"
+        label = "pulseV5"
     )
 
-    val waveAlpha by rememberInfiniteTransition(label = "wavePulseV4").animateFloat(
+    val waveAlpha by rememberInfiniteTransition(label = "wavePulseV5").animateFloat(
         initialValue = 0.8f,
         targetValue = 0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = EaseOutCubic),
+            animation = tween(2400, easing = EaseOutCubic),
             repeatMode = RepeatMode.Restart
         ),
-        label = "waveV4"
+        label = "waveV5"
+    )
+
+    val glowPulse by rememberInfiniteTransition(label = "glowV5").animateFloat(
+        initialValue = 0.2f,
+        targetValue = 0.6f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ), label = "glowV5"
     )
 
     val dotColor = if (isActive) ColorLiveRed else Color(0xFFFF8A65)
@@ -910,39 +964,18 @@ private fun EnhancedLiveIndicatorV4(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        // Breathing red dot + pulse wave
-        Box(modifier = Modifier.size(14.dp), contentAlignment = Alignment.Center) {
-            // Pulse wave ring
+        Box(modifier = Modifier.size(16.dp), contentAlignment = Alignment.Center) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val center = Offset(size.width / 2, size.height / 2)
-                drawCircle(
-                    color = dotColor.copy(alpha = waveAlpha * 0.3f),
-                    radius = size.minDimension / 2,
-                    center = center,
-                    style = Stroke(width = 1f)
-                )
+                drawCircle(color = dotColor.copy(alpha = glowPulse * 0.2f), radius = size.minDimension / 2)
+                drawCircle(color = dotColor.copy(alpha = waveAlpha * 0.3f), radius = size.minDimension / 2, style = Stroke(width = 1f))
             }
-            // Main dot
-            Box(
-                modifier = Modifier
-                    .size(7.dp)
-                    .background(
-                        brush = Brush.radialGradient(
-                            listOf(dotColor.copy(alpha = pulse), dotColor.copy(alpha = pulse * 0.5f))
-                        ),
-                        CircleShape
-                    )
-            )
+            Box(modifier = Modifier.size(8.dp).background(
+                brush = Brush.radialGradient(listOf(dotColor.copy(alpha = pulse), dotColor.copy(alpha = pulse * 0.5f))),
+                CircleShape
+            ))
         }
-
-        // LIVE text
-        Text(
-            text = "LIVE",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = dotColor.copy(alpha = pulse),
-            letterSpacing = 2.sp
-        )
+        Text(text = "LIVE", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = dotColor.copy(alpha = pulse), letterSpacing = 2.sp)
     }
 }
 
