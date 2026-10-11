@@ -7,15 +7,19 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -23,6 +27,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -32,25 +39,64 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.ykz200.smiletracker.domain.FaceAnalysis
 import com.ykz200.smiletracker.ui.EmotionProbabilities
+import com.ykz200.smiletracker.ui.estimatePosture
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+// ════════════════════════════════════════════════════════════════════════
+//  PortraitCameraScreen v4.0 — Holographic HUD Over Camera Preview
+// ════════════════════════════════════════════════════════════════════════
+//
+//  v4.0 Upgrade:
+//   - Holographic HUD panel overlaid on camera preview (frosted glass)
+//   - EmotionColorRingV4: dual-ring with rotating gradient arcs + particles
+//   - PostureGuideV4: head position indicator (green/yellow/red)
+//   - SmartHintBubbleV4: popup card with spring animation, auto-fade 3s
+//   - AmbientLightIndicatorV4: vertical light bar, sun/moon auto-switch
+//   - EnhancedLiveIndicatorV4: breathing red dot + pulse wave
+//   - WaveformBarV4: 5-segment histogram with shimmer gradient
+//   - EyeRelaxReminderV4: countdown ring, last-10-sec red pulse
+//   - BreathingDotV4: baseline learning breathing animation
+//   - EmotionParticleField: floating emotion particles
+//   - Minimal Mode: double-tap to toggle HUD visibility
+//   - Smooth transitions: spring(stiffness = 120) for all state changes
+// ════════════════════════════════════════════════════════════════════════
+
+// ── v4.0 Color Palette ──
+private val ColorBackgroundDeep    = Color(0xFF050510)
+private val ColorGlassPanel        = Color(0xCC0D0D12).copy(alpha = 0.78f)
+private val ColorGlassBorderSubtle = Color.White.copy(alpha = 0.08f)
+private val ColorLiveRed           = Color(0xFFFF3B5C)
+private val ColorPositiveGreen     = Color(0xFF8FD6A0)
+private val ColorWarningYellow     = Color(0xFFFFD480)
+
+// ── Spring Configuration v4.0 ──
+private val SpringSnappy = spring<Float>(stiffness = 120f)
+private val SpringGentle = spring<Float>(stiffness = Spring.StiffnessLow)
+
+// ── Color Constants for Emotions ──
+private val ColorSmile    = Color(0xFF4CAF50)
+private val ColorAngry    = Color(0xFFE91E63)
+private val ColorNeutral  = Color(0xFF5C6BC0)
+private val ColorThinking = Color(0xFF7E57C2)
+private val ColorSurprise = Color(0xFFFFC107)
+private val ColorFear     = Color(0xFFFF5722)
+private val ColorDisgust  = Color(0xFF795548)
+
 /**
- * 摄像头检测主界面 — 横屏布局 (左摄像头 + 右数据面板)
+ * v4.0: 摄像头检测主界面 — 全屏相机 + 全息 HUD 叠加
  *
- * v3.0 升级:
- *  - HUD风格全面升级: 半透明毛玻璃面板叠加在预览上
- *  - 情绪色环: 人脸周围随情绪变化的光环动画
- *  - 智能引导动画: 初次使用时居中脉冲圈+提示文字淡入淡出
- *  - 眼部放松提醒: 长时间用眼显示 20-20-20 法则提示
- *  - 底部迷你数据条: 微笑概率波形横条
- *  - 深色玻璃质感: 所有叠加UI使用深色毛玻璃背景
- *  - 动画系统: spring物理系统 + 呼吸动画 + 平滑过渡
+ * 布局 (全屏 Box):
+ *   底层: 摄像头 AndroidView (PreviewView) 全宽显示
+ *   中层: 全息 HUD 面板 (半透明毛玻璃)
+ *   顶层: 控件按钮 + 提示
  *
- * 关键修复:
- *  - 摄像头初始化使用 LaunchedEffect 同步等待实例就绪
- *  - 预览框 9:16 比例 + 偏上居中 (人脸可见)
- *  - 数据面板竖排横条图
+ * 双重功能:
+ *   1. 左半区域叠加 — 情绪色环 + 姿态指示 + LIVE
+ *   2. 右半区域叠加 — 积极度/能量/情绪分类 (v3 风格数据面板)
+ *   3. 底部 — 微笑波形图 + 用眼提醒
+ *
+ * 极简模式: 双击预览区切换 HUD 显示/隐藏
  */
 @Composable
 fun PortraitCameraScreen(
@@ -60,7 +106,7 @@ fun PortraitCameraScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // ─── 状态管理 ───
+    // ─── Core State ───
     var latestFace by remember { mutableStateOf<FaceAnalysis?>(null) }
     var emotionProbs by remember { mutableStateOf(EmotionProbabilities()) }
     var isLearning by remember { mutableStateOf(true) }
@@ -68,18 +114,23 @@ fun PortraitCameraScreen(
     var baselineSampleCount by remember { mutableIntStateOf(0) }
     var dominantEmotion by remember { mutableStateOf(Pair("中性", 0f)) }
     var cameraReady by remember { mutableStateOf(false) }
-
-    // 预览 View 引用
     var previewView by remember { mutableStateOf<PreviewView?>(null) }
     var analyzer by remember { mutableStateOf<AndroidCameraAnalyzer?>(null) }
 
-    // v3.0 新增状态
-    var showGuidance by remember { mutableStateOf(true) }
+    // ─── v4.0 New State ───
+    var showMinimalMode by remember { mutableStateOf(false) }
     var eyeStrainDetected by remember { mutableStateOf(false) }
     var continuousUseTime by remember { mutableIntStateOf(0) }
     val smileHistory = remember { mutableStateListOf<Float>() }
+    var ambientLightLevel by remember { mutableFloatStateOf(0.5f) }
 
-    // ─── 步骤1: 初始化 MediaPipe ───
+    // v4.0 Smart Hint system — auto-cycling tips
+    var smartHintText by remember { mutableStateOf<String?>(null) }
+
+    // v4.0 Breathing dot animation for learning
+    var learningPulseTrigger by remember { mutableIntStateOf(0) }
+
+    // ─── Step 1: Initialize MediaPipe ───
     LaunchedEffect(enableAnalysis) {
         if (!enableAnalysis) return@LaunchedEffect
         try {
@@ -95,19 +146,20 @@ fun PortraitCameraScreen(
             launch {
                 a.latestFlow.collect { face ->
                     latestFace = face
+
                     if (baselineSampleCount < 600) {
-                        // 学习阶段
+                        learningPulseTrigger++
                     } else if (isLearning) {
                         isLearning = false
                     }
+
                     learningProgress = (baselineSampleCount / 600f).coerceIn(0f, 1f)
 
-                    // 记录微笑历史 (用于波形图)
                     val smileVal = face.smileProbability.coerceIn(0f, 1f)
                     smileHistory.add(smileVal)
                     if (smileHistory.size > 60) smileHistory.removeAt(0)
 
-                    // 检测眼部疲劳
+                    // Eye strain detection
                     val eyeClosed = face.leftEyeOpenProbability in 0f..0.3f ||
                             face.rightEyeOpenProbability in 0f..0.3f
                     if (eyeClosed && baselineSampleCount > 100) {
@@ -125,11 +177,11 @@ fun PortraitCameraScreen(
                 }
             }
         } catch (e: Exception) {
-            Log.e("PortraitScreen", "Analyzer init failed: ${e.message}", e)
+            Log.e("PortraitScreenV4", "Analyzer init failed", e)
         }
     }
 
-    // ─── 步骤2: PreviewView 就绪后绑定 ───
+    // ─── Step 2: Bind PreviewView to lifecycle ───
     LaunchedEffect(previewView, analyzer) {
         val pv = previewView
         val a = analyzer
@@ -138,17 +190,16 @@ fun PortraitCameraScreen(
             a.bindToLifecycle(lifecycleOwner, pv)
             cameraReady = true
         } catch (e: Exception) {
-            Log.e("PortraitScreen", "bind failed: ${e.message}", e)
+            Log.e("PortraitScreenV4", "bind failed", e)
         }
     }
 
-    // v3.0: 用眼计时器 (模拟连续用眼时间累积)
+    // ─── v4.0: Eye strain timer (20 min reminder) ───
     LaunchedEffect(cameraReady) {
         if (cameraReady) {
             while (true) {
                 delay(1000)
                 continuousUseTime++
-                // 每20分钟触发提醒
                 if (continuousUseTime > 0 && continuousUseTime % 1200 == 0) {
                     eyeStrainDetected = true
                     delay(8000)
@@ -158,41 +209,56 @@ fun PortraitCameraScreen(
         }
     }
 
-    // v3.0: 引导动画自动消失
-    LaunchedEffect(showGuidance) {
-        if (showGuidance) {
-            delay(5000)
-            showGuidance = false
+    // ─── v4.0: Smart Hint auto-cycle ───
+    val hintMessages = remember {
+        listOf(
+            "保持微笑哦!",
+            "注意坐姿端正",
+            "记得眨眼放松",
+            "关注面部表情变化",
+            "让心情保持愉悦"
+        )
+    }
+    LaunchedEffect(cameraReady, isLearning) {
+        if (cameraReady && !isLearning) {
+            while (true) {
+                delay(12000)
+                val randomHint = hintMessages.random()
+                smartHintText = randomHint
+                delay(3500)
+                smartHintText = null
+            }
         }
     }
 
-    // 清理
+    // ─── Cleanup ───
     DisposableEffect(Unit) {
         onDispose { analyzer?.release() }
     }
 
-    // ═══ 横屏主布局 ═══
-    Row(
+    // ═══════════════════════ FULL SCREEN LAYOUT ═══════════════════════
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        // ─── 左侧 60%: 摄像头预览区 ───
+        // ──── LAYER 0: Camera Preview (full screen) ────
         Box(
-            modifier = Modifier
-                .weight(1.5f)
-                .fillMaxHeight()
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopCenter
         ) {
-            // 摄像头预览: 居中偏上
+            // Camera preview area (9:16 top portion)
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(0.9f)
+                    .fillMaxWidth()
                     .aspectRatio(9f / 16f)
                     .align(Alignment.TopCenter)
-                    .padding(top = 36.dp)
+                    .padding(top = 8.dp)
             ) {
                 AndroidView(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(8.dp)),
                     factory = { ctx ->
                         PreviewView(ctx).apply {
                             scaleType = PreviewView.ScaleType.FILL_CENTER
@@ -202,637 +268,1180 @@ fun PortraitCameraScreen(
                     }
                 )
             }
+        }
 
-            // ─ 叠加在预览上的 UI ─
+        // ──── LAYER 1: Double-tap to toggle HUD ────
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onDoubleTap = { showMinimalMode = !showMinimalMode }
+                    )
+                }
+        )
 
-            // v3.0: 智能引导动画 (居中脉冲圈)
-            AnimatedVisibility(
-                visible = showGuidance && !isLearning,
-                modifier = Modifier.align(Alignment.Center),
-                enter = fadeIn(animationSpec = tween(800)),
-                exit = fadeOut(animationSpec = tween(1200))
-            ) {
-                SmartGuidanceOverlay()
-            }
+        // ──── LAYER 2: Holographic HUD (animated visibility) ────
+        val hudAlpha by animateFloatAsState(
+            targetValue = if (showMinimalMode) 0f else 1f,
+            animationSpec = spring(stiffness = 120f),
+            label = "hudAlpha"
+        )
 
-            // v3.0: 情绪色环 (人脸周围光环动画)
-            EmotionColorRing(
-                emotionName = dominantEmotion.first,
-                emotionProb = dominantEmotion.second,
-                isActive = !isLearning && dominantEmotion.second > 0.2f,
-                modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .aspectRatio(9f / 16f)
-                    .align(Alignment.TopCenter)
-                    .padding(top = 36.dp)
-            )
-
-            // v3.0: LIVE 状态指示 — 玻璃质感
-            LiveIndicatorV3(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 42.dp, end = 12.dp)
-            )
-
-            // v3.0: 美颜模式按钮 — 玻璃质感
-            BeautyButtonV3(
-                level = 2,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(top = 42.dp, start = 12.dp)
-            )
-
-            // v3.0: 情绪上升趋势提示 — 玻璃质感
-            AnimatedVisibility(
-                visible = emotionProbs.smile > 0.4f && !isLearning,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 44.dp),
-                enter = slideInVertically(
-                    initialOffsetY = { -it },
-                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                ) + fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)),
-                exit = slideOutVertically(
-                    targetOffsetY = { -it },
-                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                ) + fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow))
-            ) {
-                EmotionRisingTagV3()
-            }
-
-            // 预览框内: 人脸检测框 + 情绪标签
+        if (hudAlpha > 0.01f) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .aspectRatio(9f / 16f)
-                    .align(Alignment.TopCenter)
-                    .padding(top = 36.dp)
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = hudAlpha }
             ) {
-                FaceDetectionOverlayV3(
+                // ─── Left-side HUD overlay: Emotion Ring + LIVE + Posture ───
+                HolographicHUDPanel(
+                    modifier = Modifier
+                        .fillMaxWidth(0.9f)
+                        .aspectRatio(9f / 16f)
+                        .align(Alignment.TopCenter)
+                        .padding(top = 8.dp),
+                    dominantEmotionName = dominantEmotion.first,
+                    dominantEmotionProb = dominantEmotion.second,
                     isLearning = isLearning,
-                    emotionName = dominantEmotion.first,
-                    modifier = Modifier.align(Alignment.Center)
+                    headPitch = latestFace?.headPitch ?: 0f,
+                    headYaw = latestFace?.headYaw ?: 0f,
+                    ambientLight = ambientLightLevel,
+                    showMinimalMode = showMinimalMode
                 )
 
-                // 情绪大标签 (人脸下方) — 玻璃质感
-                AnimatedVisibility(
-                    visible = dominantEmotion.second > 0.3f,
+                // ─── LIVE indicator — Top Right of preview ───
+                EnhancedLiveIndicatorV4(
                     modifier = Modifier
-                        .align(Alignment.Center)
-                        .offset(y = 90.dp),
-                    enter = scaleIn(animationSpec = spring(stiffness = Spring.StiffnessMedium)) +
-                            fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)),
-                    exit = scaleOut(animationSpec = spring(stiffness = Spring.StiffnessMedium)) +
-                           fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow))
-                ) {
-                    DominantEmotionLabelV3(
-                        name = dominantEmotion.first,
-                        probability = dominantEmotion.second
+                        .align(Alignment.TopStart)
+                        .padding(start = 16.dp, top = 14.dp),
+                    isVisible = !showMinimalMode,
+                    isActive = cameraReady
+                )
+
+                // ─── Ambient Light Indicator — Left side vertical bar ───
+                AmbientLightIndicatorV4(
+                    lightLevel = ambientLightLevel,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 4.dp)
+                )
+
+                // ─── Waveform Bar — Bottom of preview area ───
+                if (!isLearning && smileHistory.size >= 3) {
+                    WaveformBarV4(
+                        data = smileHistory.toList(),
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth(0.88f)
+                            .padding(bottom = 10.dp)
                     )
                 }
 
-                // v3.0: 学习基线提示 — 玻璃质感
+                // ─── Posture Guide — Top left corner ───
+                PostureGuideV4(
+                    pitch = latestFace?.headPitch ?: 0f,
+                    yaw = latestFace?.headYaw ?: 0f,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(end = 16.dp, top = 14.dp)
+                )
+
+                // ─── Breathing Dot — Center (during learning) ───
                 if (isLearning) {
-                    LearningBaselineOverlayV3(
+                    BreathingDotV4(
+                        progress = learningProgress,
+                        pulseTrigger = learningPulseTrigger,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+
+                // ─── Learning Baseline Overlay ───
+                if (isLearning) {
+                    LearningBaselineOverlayV4(
                         progress = learningProgress,
                         count = baselineSampleCount,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 16.dp)
+                            .fillMaxWidth(0.88f)
+                            .padding(bottom = 60.dp)
+                    )
+                }
+
+                // ─── Diagnostic Overlay ───
+                if (baselineSampleCount == 0 && !cameraReady) {
+                    DiagnosticOverlayV4(
+                        analyzer = analyzer,
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(start = 8.dp, bottom = 8.dp)
+                    )
+                }
+
+                // ─── Emotion Label (below face area) ───
+                AnimatedVisibility(
+                    visible = !isLearning && dominantEmotion.second > 0.3f,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .offset(y = 90.dp),
+                    enter = scaleIn(animationSpec = spring(stiffness = 120f)) + fadeIn(animationSpec = spring(stiffness = 120f)),
+                    exit = scaleOut(animationSpec = spring(stiffness = 120f)) + fadeOut(animationSpec = spring(stiffness = 120f))
+                ) {
+                    DominantEmotionLabelV4(
+                        name = dominantEmotion.first,
+                        probability = dominantEmotion.second
                     )
                 }
             }
+        }
 
-            // 诊断叠加
-            if (baselineSampleCount == 0) {
-                DiagnosticOverlayV3(
-                    analyzer = analyzer,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 8.dp)
-                )
-            }
-
-            // v3.0: 眼部放松提醒
+        // ──── LAYER 3: Right-side Data Panel (above HUD) ────
+        Row(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Spacer(modifier = Modifier.weight(1.5f))
+            // Right 40% data panel
             AnimatedVisibility(
-                visible = eyeStrainDetected,
-                modifier = Modifier.align(Alignment.Center),
-                enter = fadeIn(animationSpec = tween(600)) + scaleIn(
-                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                    initialScale = 0.9f
-                ),
-                exit = fadeOut(animationSpec = tween(800)) + scaleOut(
-                    animationSpec = spring(stiffness = Spring.StiffnessMedium),
-                    targetScale = 0.95f
-                )
+                visible = !showMinimalMode && !isLearning,
+                modifier = Modifier.weight(1f),
+                enter = slideInHorizontally(animationSpec = spring(stiffness = 120f), initialOffsetX = { it / 2 }) + fadeIn(animationSpec = SpringSnappy),
+                exit = slideOutHorizontally(animationSpec = spring(stiffness = 120f), targetOffsetX = { it / 3 }) + fadeOut(animationSpec = SpringSnappy)
             ) {
-                EyeRelaxReminder(
-                    onDismiss = { eyeStrainDetected = false }
-                )
-            }
-
-            // v3.0: 左下角迷你按钮组 — 玻璃质感
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 8.dp, bottom = 48.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                MiniCircleButtonV3(
-                    label = if (baselineSampleCount < 100) "GO" else "$baselineSampleCount",
-                    backgroundColor = Color(0xCC000000)
-                )
-                MiniCircleButtonV3(
-                    label = "D",
-                    backgroundColor = Color(0x66000000),
-                    onClick = onNavigateToDashboard
-                )
-            }
-
-            // v3.0: 底部迷你数据条 — 微笑概率波形
-            if (!isLearning && smileHistory.size >= 3) {
-                BottomMiniWaveBar(
-                    data = smileHistory.toList(),
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth(0.85f)
-                        .padding(bottom = 12.dp)
+                DataPanelV4(
+                    emotionProbs = emotionProbs,
+                    positivityIndex = emotionProbs.positivityIndex(),
+                    onDashboardClick = onNavigateToDashboard
                 )
             }
         }
 
-        // ─── 右侧 40%: 数据面板 ───
-        Column(
+        // ──── LAYER 4: Smart Hint Bubble (bottom-right) ────
+        AnimatedVisibility(
+            visible = smartHintText != null,
             modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .background(Color(0xFF0A0A0A))
-                .padding(horizontal = 12.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = 80.dp),
+            enter = slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+            ) + fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)),
+            exit = slideOutVertically(
+                targetOffsetY = { it / 2 },
+                animationSpec = tween(500)
+            ) + fadeOut(animationSpec = tween(500))
         ) {
-            // 顶部功能按钮
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                MiniCircleButtonV3(
-                    label = "F",
-                    backgroundColor = Color(0xCC1A1A1A)
-                )
-            }
-
-            // 积极指数卡 — 玻璃质感
-            PositivityIndexCompactV3(
-                index = emotionProbs.positivityIndex()
-            )
-
-            // 情绪柱状图
-            EmotionBarsVerticalV3(
-                emotions = emotionProbs.sorted().take(6)
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════
-// v3.0 子 UI 组件
-// ═══════════════════════════════════════════════════════
-
-/**
- * v3.0: 智能引导动画 — 居中脉冲圈 + 提示文字
- */
-@Composable
-private fun SmartGuidanceOverlay() {
-    val pulseRadius by rememberInfiniteTransition(label = "guidePulse").animateFloat(
-        initialValue = 30f,
-        targetValue = 80f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = EaseOutCubic),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "pulseRadius"
-    )
-    val pulseAlpha by rememberInfiniteTransition(label = "guideAlpha").animateFloat(
-        initialValue = 0.6f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = EaseOutCubic),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "pulseAlpha"
-    )
-
-    Column(
-        modifier = Modifier.size(200.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Box(
-            modifier = Modifier.size(160.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            // 脉冲圈
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val center = Offset(size.width / 2, size.height / 2)
-                drawCircle(
-                    color = Color(0xFF00E5FF).copy(alpha = pulseAlpha * 0.4f),
-                    radius = pulseRadius,
-                    center = center,
-                    style = Stroke(width = 2f)
-                )
-                drawCircle(
-                    color = Color(0xFF00E5FF).copy(alpha = pulseAlpha * 0.2f),
-                    radius = pulseRadius * 0.6f,
-                    center = center,
-                    style = Stroke(width = 1.5f)
-                )
-            }
-
-            // 中心圆点
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(Color(0xFF00E5FF), CircleShape)
+            SmartHintBubbleV4(
+                message = smartHintText ?: "",
+                emotionName = dominantEmotion.first
             )
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        // ──── LAYER 5: Eye Strain Reminder (center modal) ────
+        AnimatedVisibility(
+            visible = eyeStrainDetected,
+            modifier = Modifier.align(Alignment.Center),
+            enter = fadeIn(animationSpec = tween(600)) + scaleIn(
+                animationSpec = spring(stiffness = 120f),
+                initialScale = 0.9f
+            ),
+            exit = fadeOut(animationSpec = tween(800)) + scaleOut(
+                animationSpec = spring(stiffness = 120f),
+                targetScale = 0.95f
+            )
+        ) {
+            EyeRelaxReminderV4(onDismiss = { eyeStrainDetected = false })
+        }
 
-        // 提示文字 — 玻璃质感背景
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = Color(0x99000000)
+        // ──── LAYER 6: Minimal mode hint text ────
+        AnimatedVisibility(
+            visible = showMinimalMode,
+            modifier = Modifier.align(Alignment.Center),
+            enter = fadeIn(tween(400)),
+            exit = fadeOut(tween(400))
         ) {
             Text(
-                text = "面向正前方",
+                text = "双击屏幕显示 HUD",
                 fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFFEEEEEE),
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                color = Color.White.copy(alpha = 0.4f),
                 textAlign = TextAlign.Center
             )
         }
-    }
-}
 
-/**
- * v3.0: 情绪色环 — 在人脸周围叠加随情绪变化的光环动画
- * 用 Canvas 绘制围绕人脸区域的彩色圆环
- */
-@Composable
-private fun EmotionColorRing(
-    emotionName: String,
-    emotionProb: Float,
-    isActive: Boolean,
-    modifier: Modifier = Modifier
-) {
-    // 根据情绪选择颜色
-    val ringColor = when {
-        emotionName == "微笑" -> Color(0xFF4CAF50)
-        emotionName == "生气" -> Color(0xFFE91E63)
-        emotionName == "思考" -> Color(0xFF7E57C2)
-        emotionName == "惊讶" -> Color(0xFFFFC107)
-        emotionName == "恐惧" -> Color(0xFFFF5722)
-        emotionName == "中性" -> Color(0xFF5C6BC0)
-        else -> Color(0xFF00E5FF)
-    }
-
-    // 呼吸动画
-    val breathe by rememberInfiniteTransition(label = "ringBreathe").animateFloat(
-        initialValue = 0.95f,
-        targetValue = 1.05f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2500, easing = EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "ringScale"
-    )
-
-    // 旋转动画
-    val rotation by rememberInfiniteTransition(label = "ringRotate").animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(8000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "ringRotation"
-    )
-
-    val animatedAlpha by animateFloatAsState(
-        targetValue = if (isActive) 0.6f * emotionProb else 0f,
-        animationSpec = spring(stiffness = Spring.StiffnessLow),
-        label = "ringAlpha"
-    )
-
-    Canvas(modifier = modifier) {
-        val centerX = size.width / 2
-        val centerY = size.height * 0.42f
-        val baseRadius = size.minDimension * 0.2f * breathe
-
-        if (animatedAlpha > 0.01f) {
-            // 外环 — 渐变光晕
-            drawCircle(
-                color = ringColor.copy(alpha = animatedAlpha * 0.3f),
-                radius = baseRadius * 1.2f * (1 + emotionProb * 0.3f),
-                center = Offset(centerX, centerY),
-                style = Stroke(width = 3f)
+        // ──── LAYER 7: Emotion Particle Field (background decoration) ────
+        if (!isLearning && dominantEmotion.second > 0.2f) {
+            EmotionParticleField(
+                emotionColor = emotionColorFromName(dominantEmotion.first),
+                intensity = dominantEmotion.second,
+                modifier = Modifier.fillMaxSize()
             )
-
-            // 内环 — 旋转弧线
-            val arcRadius = baseRadius * 0.9f
-            val sweepAngle = 120f + emotionProb * 60f
-            drawArc(
-                color = ringColor.copy(alpha = animatedAlpha),
-                startAngle = rotation,
-                sweepAngle = sweepAngle,
-                useCenter = false,
-                topLeft = Offset(centerX - arcRadius, centerY - arcRadius),
-                size = Size(arcRadius * 2, arcRadius * 2),
-                style = Stroke(width = 2.5f, cap = StrokeCap.Round)
-            )
-
-            // 对称的另一段弧
-            drawArc(
-                color = ringColor.copy(alpha = animatedAlpha * 0.7f),
-                startAngle = rotation + 180f,
-                sweepAngle = sweepAngle,
-                useCenter = false,
-                topLeft = Offset(centerX - arcRadius, centerY - arcRadius),
-                size = Size(arcRadius * 2, arcRadius * 2),
-                style = Stroke(width = 2f, cap = StrokeCap.Round)
-            )
-
-            // 微光点 (沿圆周分布)
-            val dotCount = 3
-            for (i in 0 until dotCount) {
-                val angle = Math.toRadians((rotation + i * 120f).toDouble())
-                val dotX = centerX + arcRadius * kotlin.math.cos(angle).toFloat()
-                val dotY = centerY + arcRadius * kotlin.math.sin(angle).toFloat()
-                drawCircle(
-                    color = ringColor.copy(alpha = animatedAlpha * 0.8f),
-                    radius = 2.5f,
-                    center = Offset(dotX, dotY)
-                )
-            }
         }
     }
 }
 
-/**
- * v3.0: LIVE 状态指示 — 深色玻璃质感
- */
-@Composable
-private fun LiveIndicatorV3(modifier: Modifier = Modifier) {
-    val pulse by rememberInfiniteTransition(label = "livePulse").animateFloat(
-        initialValue = 0.4f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ), label = "liveAlpha"
-    )
+// ════════════════════════════════════════════════════════════════════════
+//  SUB-COMPONENTS v4.0
+// ════════════════════════════════════════════════════════════════════════
 
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        color = Color(0xB3000000)
-    ) {
-        // 微光边框
+// ─── 1. Holographic HUD Panel ───
+@Composable
+private fun HolographicHUDPanel(
+    modifier: Modifier = Modifier,
+    dominantEmotionName: String,
+    dominantEmotionProb: Float,
+    isLearning: Boolean,
+    headPitch: Float,
+    headYaw: Float,
+    ambientLight: Float,
+    showMinimalMode: Boolean
+) {
+    Box(modifier = modifier) {
+        // Background frosted glass panel
         Box(
             modifier = Modifier
-                .drawBehind {
-                    drawRoundRect(
-                        color = Color(0xFF00E5FF).copy(alpha = 0.15f),
-                        cornerRadius = CornerRadius(8.dp.toPx()),
-                        style = Stroke(width = 1f)
-                    )
-                }
-                .padding(horizontal = 10.dp, vertical = 5.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(7.dp)
-                        .background(
-                            Brush.radialGradient(
-                                listOf(
-                                    Color(0xFF00E5FF).copy(alpha = pulse),
-                                    Color(0xFF00E5FF).copy(alpha = pulse * 0.5f)
-                                )
-                            ),
-                            CircleShape
+                .matchParentSize()
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0x330D0D12).copy(alpha = 0.5f),
+                            Color.Transparent,
+                            Color(0x330D0D12).copy(alpha = 0.5f)
                         )
-                )
-                Text(
-                    text = "LIVE",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF00E5FF).copy(alpha = pulse),
-                    letterSpacing = 2.sp
-                )
-            }
-        }
-    }
-}
-
-/**
- * v3.0: 美颜模式按钮 — 深色玻璃质感
- */
-@Composable
-private fun BeautyButtonV3(level: Int, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(10.dp),
-        color = Color(0xB31A1A1A)
-    ) {
-        Row(
-            modifier = Modifier
-                .drawBehind {
-                    drawRoundRect(
-                        color = Color(0xFFFFC107).copy(alpha = 0.2f),
-                        cornerRadius = CornerRadius(10.dp.toPx()),
-                        style = Stroke(width = 1f)
                     )
-                }
-                .padding(horizontal = 10.dp, vertical = 5.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            // Canvas 绘制星形图标
-            Canvas(modifier = Modifier.size(14.dp)) {
-                val cx = size.width / 2
-                val cy = size.height / 2
-                val r = size.minDimension / 2 * 0.7f
-                val color = Color(0xFFFFC107)
-                for (i in 0 until 5) {
-                    val outerAngle = Math.toRadians((i * 72 - 90).toDouble())
-                    val innerAngle = Math.toRadians((i * 72 - 90 + 36).toDouble())
-                    val ox = cx + r * kotlin.math.cos(outerAngle).toFloat()
-                    val oy = cy + r * kotlin.math.sin(outerAngle).toFloat()
-                    val ix = cx + r * 0.4f * kotlin.math.cos(innerAngle).toFloat()
-                    val iy = cy + r * 0.4f * kotlin.math.sin(innerAngle).toFloat()
-                    if (i == 0) drawLine(color, Offset(ox, oy), Offset(ix, iy), 1.5f, StrokeCap.Round)
-                    val prevOuter = Math.toRadians(((i - 1 + 5) % 5 * 72 - 90).toDouble())
-                    val pox = cx + r * kotlin.math.cos(prevOuter).toFloat()
-                    val poy = cy + r * kotlin.math.sin(prevOuter).toFloat()
-                    drawLine(color, Offset(pox, poy), Offset(ix, iy), 1.5f, StrokeCap.Round)
-                }
-            }
-            Text(
-                text = "美颜$level",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFFFFC107)
-            )
-        }
-    }
-}
+                )
+        )
 
-/**
- * v3.0: 情绪上升趋势提示 — 玻璃质感
- */
-@Composable
-private fun EmotionRisingTagV3() {
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = Color(0xB31A1A1A)
-    ) {
-        Row(
+        // Top glass strip — LIVE zone
+        Box(
             modifier = Modifier
-                .drawBehind {
-                    drawRoundRect(
-                        color = Color(0xFF4CAF50).copy(alpha = 0.25f),
-                        cornerRadius = CornerRadius(10.dp.toPx()),
-                        style = Stroke(width = 1f)
+                .align(Alignment.TopStart)
+                .fillMaxWidth(0.45f)
+                .padding(start = 40.dp, top = 40.dp)
+                .background(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            ColorGlassPanel.copy(alpha = 0.05f),
+                            Color.Transparent
+                        )
                     )
-                }
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                )
+        )
+
+        // Bottom glass strip — waveform zone
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth(0.88f)
+                .padding(start = 6.dp, bottom = 40.dp)
+                .background(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            ColorGlassPanel.copy(alpha = 0.08f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+
+        // ─── Center: Emotion Color Ring ───
+        EmotionColorRingV4(
+            emotionName = dominantEmotionName,
+            emotionProb = dominantEmotionProb,
+            isActive = !isLearning && dominantEmotionProb > 0.2f,
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .aspectRatio(1f)
+                .align(Alignment.Center)
+        )
+
+        // ─── Ambient Light right edge ───
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 4.dp)
+                .width(3.dp)
+                .fillMaxHeight(0.4f)
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color(0xFFFFC107).copy(alpha = ambientLight),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+
+        // ─── Border glow effect ───
+        Canvas(
+            modifier = Modifier
+                .matchParentSize()
+                .padding(4.dp)
         ) {
-            // Canvas 绘制笑脸
-            Canvas(modifier = Modifier.size(16.dp)) {
-                val cx = size.width / 2
-                val cy = size.height / 2
-                val r = size.minDimension / 2 * 0.8f
-                val color = Color(0xFF4CAF50)
-                drawCircle(color = color, radius = r, style = Stroke(width = 1.5f))
-                drawCircle(color = color, radius = r * 0.15f, Offset(cx - r * 0.3f, cy - r * 0.2f))
-                drawCircle(color = color, radius = r * 0.15f, Offset(cx + r * 0.3f, cy - r * 0.2f))
-                val smilePath = androidx.compose.ui.graphics.Path().apply {
-                    moveTo(cx - r * 0.4f, cy + r * 0.1f)
-                    quadraticBezierTo(cx, cy + r * 0.5f, cx + r * 0.4f, cy + r * 0.1f)
-                }
-                drawPath(smilePath, color, style = Stroke(width = 1.5f, cap = StrokeCap.Round))
-            }
-            Text(
-                text = "情绪在上升",
-                fontSize = 12.sp,
-                color = Color(0xFF4CAF50),
-                fontWeight = FontWeight.SemiBold
-            )
-            // 上升箭头 — Canvas 绘制
-            Canvas(modifier = Modifier.size(12.dp)) {
-                val color = Color(0xFF4CAF50)
-                drawLine(color, Offset(size.width / 2, size.height), Offset(size.width / 2, 0f), 2f, StrokeCap.Round)
-                drawLine(color, Offset(0f, size.height * 0.3f), Offset(size.width / 2, 0f), 2f, StrokeCap.Round)
-                drawLine(color, Offset(size.width, size.height * 0.3f), Offset(size.width / 2, 0f), 2f, StrokeCap.Round)
-            }
-        }
-    }
-}
-
-/**
- * v3.0: 人脸检测框 — 精致角点 + 呼吸动画
- */
-@Composable
-private fun FaceDetectionOverlayV3(
-    isLearning: Boolean,
-    emotionName: String,
-    modifier: Modifier = Modifier
-) {
-    val breathe by rememberInfiniteTransition(label = "faceBreathe").animateFloat(
-        initialValue = 0.97f, targetValue = 1.03f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(3000, easing = EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ), label = "faceScale"
-    )
-
-    val ringColor = when {
-        emotionName == "微笑" -> Color(0xFF4CAF50)
-        emotionName == "生气" -> Color(0xFFE91E63)
-        emotionName == "思考" -> Color(0xFF7E57C2)
-        emotionName == "惊讶" -> Color(0xFFFFC107)
-        emotionName == "中性" -> Color(0xFF5C6BC0)
-        else -> if (isLearning) Color(0xFF4FC3F7) else Color(0xFF00E5FF)
-    }
-
-    Box(
-        modifier = modifier.size(180.dp * breathe),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val r = size.minDimension / 2
-            val cornerLen = r * 0.22f
-            val strokeW = 2.5f
-
-            // 四角装饰 (L形)
-            val corners = listOf(
-                // 左上
-                listOf(Offset(0f, cornerLen), Offset(0f, 0f), Offset(cornerLen, 0f)),
-                // 右上
-                listOf(Offset(size.width - cornerLen, 0f), Offset(size.width, 0f), Offset(size.width, cornerLen)),
-                // 左下
-                listOf(Offset(0f, size.height - cornerLen), Offset(0f, size.height), Offset(cornerLen, size.height)),
-                // 右下
-                listOf(Offset(size.width - cornerLen, size.height), Offset(size.width, size.height), Offset(size.width, size.height - cornerLen))
-            )
-
-            corners.forEach { path ->
-                drawLine(ringColor, path[0], path[1], strokeW, cap = StrokeCap.Round)
-                drawLine(ringColor, path[1], path[2], strokeW, cap = StrokeCap.Round)
-            }
-
-            // 内圈虚线 (淡淡的引导圈)
-            drawCircle(
-                color = ringColor.copy(alpha = 0.15f),
-                radius = r * 0.7f,
-                center = Offset(size.width / 2, size.height / 2),
+            drawRoundRect(
+                color = Color.White.copy(alpha = 0.04f),
+                cornerRadius = CornerRadius(8.dp.toPx()),
                 style = Stroke(width = 1f)
             )
         }
     }
 }
 
-/**
- * v3.0: 主导情绪标签 — 玻璃质感
- */
+// ─── 2. Emotion Color Ring v4.0 ───
 @Composable
-private fun DominantEmotionLabelV3(name: String, probability: Float) {
-    val emotionColor = when (name) {
-        "微笑" -> Color(0xFF4CAF50)
-        "生气" -> Color(0xFFE91E63)
-        "中性" -> Color(0xFF5C6BC0)
-        "思考" -> Color(0xFF7E57C2)
-        "惊讶" -> Color(0xFFFFC107)
-        else -> Color(0xFF00E5FF)
+private fun EmotionColorRingV4(
+    emotionName: String,
+    emotionProb: Float,
+    isActive: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val ringColor = emotionColorFromName(emotionName)
+    val breathe by rememberInfiniteTransition(label = "ringBreatheV4").animateFloat(
+        initialValue = 0.96f,
+        targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2500, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "breatheV4"
+    )
+
+    val rotation by rememberInfiniteTransition(label = "ringRotateV4").animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(10000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotationV4"
+    )
+
+    val rotationReverse by rememberInfiniteTransition(label = "ringRotateRevV4").animateFloat(
+        initialValue = 360f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(14000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotationRevV4"
+    )
+
+    val animatedAlpha by animateFloatAsState(
+        targetValue = if (isActive) (0.5f + emotionProb * 0.5f) else 0f,
+        animationSpec = spring(stiffness = 120f),
+        label = "ringAlphaV4"
+    )
+
+    Canvas(modifier = modifier) {
+        val cx = size.width / 2
+        val cy = size.height / 2
+        val baseRadius = size.minDimension * 0.28f * breathe
+
+        if (animatedAlpha > 0.02f) {
+            // Outer glow layer 2 — wide soft glow
+            drawCircle(
+                color = ringColor.copy(alpha = animatedAlpha * 0.08f),
+                radius = baseRadius * 1.6f,
+                center = Offset(cx, cy)
+            )
+            // Outer glow layer 1
+            drawCircle(
+                color = ringColor.copy(alpha = animatedAlpha * 0.15f),
+                radius = baseRadius * 1.3f,
+                center = Offset(cx, cy)
+            )
+
+            // Outer ring — rotating gradient arc
+            val outerRadius = baseRadius * 1.15f
+            val sweepArc = 100f + emotionProb * 80f
+
+            rotate(rotation, Offset(cx, cy)) {
+                drawArc(
+                    color = ringColor.copy(alpha = animatedAlpha * 0.7f),
+                    startAngle = 0f,
+                    sweepAngle = sweepArc,
+                    useCenter = false,
+                    topLeft = Offset(cx - outerRadius, cy - outerRadius),
+                    size = Size(outerRadius * 2, outerRadius * 2),
+                    style = Stroke(width = 3.5f, cap = StrokeCap.Round)
+                )
+                drawArc(
+                    color = ringColor.copy(alpha = animatedAlpha * 0.4f),
+                    startAngle = 180f,
+                    sweepAngle = sweepArc * 0.8f,
+                    useCenter = false,
+                    topLeft = Offset(cx - outerRadius, cy - outerRadius),
+                    size = Size(outerRadius * 2, outerRadius * 2),
+                    style = Stroke(width = 2.5f, cap = StrokeCap.Round)
+                )
+            }
+
+            // Inner ring — counter-rotating shimmer particles
+            val innerRadius = baseRadius * 0.75f
+            rotate(-rotationReverse, Offset(cx, cy)) {
+                val dotCount = 8
+                for (i in 0 until dotCount) {
+                    val angle = Math.toRadians((i * 360.0 / dotCount))
+                    val px = cx + innerRadius * kotlin.math.cos(angle).toFloat()
+                    val py = cy + innerRadius * kotlin.math.sin(angle).toFloat()
+                    val flicker = (kotlin.math.sin(angle * 3 + rotation * 0.02f).toFloat() + 1f) / 2f
+                    drawCircle(
+                        color = ringColor.copy(alpha = animatedAlpha * (0.3f + flicker * 0.4f)),
+                        radius = 2.5f + flicker * 1.5f,
+                        center = Offset(px, py)
+                    )
+                }
+            }
+
+            // Center breathing dot
+            val dotRadius = baseRadius * 0.12f * (1f + emotionProb * 0.5f)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        ringColor.copy(alpha = animatedAlpha * 0.8f),
+                        ringColor.copy(alpha = 0f)
+                    ),
+                    center = Offset(cx, cy),
+                    radius = dotRadius * 2
+                ),
+                radius = dotRadius,
+                center = Offset(cx, cy)
+            )
+        }
+    }
+}
+
+// ─── 3. Posture Guide v4.0 ───
+@Composable
+private fun PostureGuideV4(
+    pitch: Float,
+    yaw: Float,
+    modifier: Modifier = Modifier
+) {
+    val statusColor = when {
+        kotlin.math.abs(pitch) < 8f && kotlin.math.abs(yaw) < 10f -> ColorPositiveGreen
+        kotlin.math.abs(pitch) < 15f && kotlin.math.abs(yaw) < 20f -> ColorWarningYellow
+        else -> ColorLiveRed
     }
 
-    val emotionIcon: String = when (name) {
-        "微笑" -> ":)"
-        "生气" -> ">:("
-        "中性" -> ":|"
-        "思考" -> "?.?"
-        "惊讶" -> ":O"
-        else -> ":|"
+    val statusText = estimatePosture(pitch, yaw, 0f)
+
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        // Mini indicator
+        Canvas(modifier = Modifier.size(18.dp)) {
+            // Outer ring
+            drawCircle(
+                color = statusColor.copy(alpha = 0.5f),
+                radius = size.minDimension / 2,
+                style = Stroke(width = 1.5f)
+            )
+            // Inner dot — offset based on head position
+            val dotOffset = Offset(
+                (yaw / 30f * size.width * 0.2f).coerceIn(-size.width * 0.15f, size.width * 0.15f),
+                (-pitch / 20f * size.height * 0.2f).coerceIn(-size.height * 0.15f, size.height * 0.15f)
+            )
+            drawCircle(
+                color = statusColor,
+                radius = size.minDimension * 0.15f,
+                center = Offset(size.width / 2, size.height / 2) + dotOffset
+            )
+        }
+
+        // Status text
+        Text(
+            text = statusText,
+            fontSize = 9.sp,
+            color = statusColor,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1
+        )
     }
+}
+
+// ─── 4. Smart Hint Bubble v4.0 ───
+@Composable
+private fun SmartHintBubbleV4(
+    message: String,
+    emotionName: String
+) {
+    val hintColor = emotionColorFromName(emotionName).copy(alpha = 0.8f)
+
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = ColorGlassPanel,
+        shadowElevation = 8.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .drawBehind {
+                    drawRoundRect(
+                        color = hintColor.copy(alpha = 0.2f),
+                        cornerRadius = CornerRadius(16.dp.toPx()),
+                        style = Stroke(width = 1f)
+                    )
+                }
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Icon dot
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(hintColor, CircleShape)
+            )
+            Text(
+                text = message,
+                fontSize = 12.sp,
+                color = Color.White.copy(alpha = 0.9f),
+                fontWeight = FontWeight.Medium,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+// ─── 5. Ambient Light Indicator v4.0 ───
+@Composable
+private fun AmbientLightIndicatorV4(
+    lightLevel: Float,
+    modifier: Modifier = Modifier
+) {
+    val isLowLight = lightLevel < 0.3f
+    val indicatorColor = if (isLowLight) Color(0xFF5C6BC0) else Color(0xFFFFC107)
+
+    Row(
+        modifier = modifier.height(100.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        // Vertical light bar
+        Canvas(modifier = Modifier.width(4.dp).fillMaxHeight()) {
+            val barHeight = size.height * lightLevel
+            // Background track
+            drawRoundRect(
+                color = Color.White.copy(alpha = 0.05f),
+                size = Size(size.width, size.height),
+                cornerRadius = CornerRadius(2.dp.toPx())
+            )
+            // Fill level (from bottom)
+            drawRoundRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        indicatorColor.copy(alpha = 0.1f),
+                        indicatorColor.copy(alpha = 0.7f)
+                    )
+                ),
+                topLeft = Offset(0f, size.height - barHeight),
+                size = Size(size.width, barHeight),
+                cornerRadius = CornerRadius(2.dp.toPx())
+            )
+        }
+
+        // Sun / Moon icon
+        Canvas(modifier = Modifier.size(10.dp)) {
+            val color = indicatorColor
+            val cx = size.width / 2
+            val cy = size.height / 2
+            if (!isLowLight) {
+                // Sun — circle with rays
+                drawCircle(color = color, radius = size.minDimension * 0.3f)
+                // Rays
+                for (i in 0 until 6) {
+                    val angle = Math.toRadians((i * 60).toDouble())
+                    val r1 = size.minDimension * 0.35f
+                    val r2 = size.minDimension * 0.45f
+                    drawLine(
+                        color = color,
+                        start = Offset(cx + r1 * kotlin.math.cos(angle).toFloat(), cy + r1 * kotlin.math.sin(angle).toFloat()),
+                        end = Offset(cx + r2 * kotlin.math.cos(angle).toFloat(), cy + r2 * kotlin.math.sin(angle).toFloat()),
+                        strokeWidth = 1f,
+                        cap = StrokeCap.Round
+                    )
+                }
+            } else {
+                // Moon — crescent shape
+                drawCircle(color = color, radius = size.minDimension * 0.35f)
+                drawCircle(
+                    color = ColorBackgroundDeep,
+                    radius = size.minDimension * 0.28f,
+                    center = Offset(size.width * 0.35f, size.height * 0.5f)
+                )
+            }
+        }
+    }
+}
+
+// ─── 6. Enhanced LIVE Indicator v4.0 ───
+@Composable
+private fun EnhancedLiveIndicatorV4(
+    modifier: Modifier = Modifier,
+    isVisible: Boolean,
+    isActive: Boolean
+) {
+    val pulse by rememberInfiniteTransition(label = "livePulseV4").animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseV4"
+    )
+
+    val waveAlpha by rememberInfiniteTransition(label = "wavePulseV4").animateFloat(
+        initialValue = 0.8f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2200, easing = EaseOutCubic),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "waveV4"
+    )
+
+    val dotColor = if (isActive) ColorLiveRed else Color(0xFFFF8A65)
+
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        // Breathing red dot + pulse wave
+        Box(modifier = Modifier.size(14.dp), contentAlignment = Alignment.Center) {
+            // Pulse wave ring
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val center = Offset(size.width / 2, size.height / 2)
+                drawCircle(
+                    color = dotColor.copy(alpha = waveAlpha * 0.3f),
+                    radius = size.minDimension / 2,
+                    center = center,
+                    style = Stroke(width = 1f)
+                )
+            }
+            // Main dot
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .background(
+                        brush = Brush.radialGradient(
+                            listOf(dotColor.copy(alpha = pulse), dotColor.copy(alpha = pulse * 0.5f))
+                        ),
+                        CircleShape
+                    )
+            )
+        }
+
+        // LIVE text
+        Text(
+            text = "LIVE",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = dotColor.copy(alpha = pulse),
+            letterSpacing = 2.sp
+        )
+    }
+}
+
+// ─── 7. Waveform Bar v4.0 (5-segment histogram) ───
+@Composable
+private fun WaveformBarV4(
+    data: List<Float>,
+    modifier: Modifier = Modifier
+) {
+    val waveColor = Color(0xFF8FD6A0)
+
+    Surface(
+        modifier = modifier.shadow(4.dp, RoundedCornerShape(10.dp)),
+        shape = RoundedCornerShape(10.dp),
+        color = ColorGlassPanel
+    ) {
+        Row(
+            modifier = Modifier
+                .drawBehind {
+                    drawRoundRect(
+                        color = waveColor.copy(alpha = 0.1f),
+                        cornerRadius = CornerRadius(10.dp.toPx()),
+                        style = Stroke(width = 1f)
+                    )
+                }
+                .padding(horizontal = 10.dp, vertical = 6.dp)
+                .height(32.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Label
+            Text(
+                text = "微笑",
+                fontSize = 9.sp,
+                color = Color(0xFF888888),
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.width(24.dp)
+            )
+
+            // 5-segment histogram
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                val segments = 5
+                val segmentData = if (data.size >= segments) {
+                    val step = data.size / segments
+                    (0 until segments).map { i ->
+                        val start = i * step
+                        val end = minOf((i + 1) * step, data.size)
+                        data.subList(start, end).average().toFloat()
+                    }
+                } else { List(segments) { 0f } }
+
+                segmentData.forEachIndexed { index, value ->
+                    val animatedHeight by animateFloatAsState(
+                        targetValue = value.coerceIn(0.05f, 1f),
+                        animationSpec = spring(stiffness = 120f),
+                        label = "barV4_$index"
+                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(animatedHeight)
+                            .background(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        waveColor.copy(alpha = 0.9f),
+                                        waveColor.copy(alpha = 0.4f)
+                                    )
+                                ),
+                                shape = RoundedCornerShape(2.dp)
+                            )
+                    )
+                }
+            }
+
+            // Current value
+            Text(
+                text = "${(data.lastOrNull() ?: 0f) * 100}%",
+                fontSize = 10.sp,
+                color = waveColor,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.End,
+                modifier = Modifier.width(26.dp)
+            )
+        }
+    }
+}
+
+// ─── 8. Eye Relax Reminder v4.0 ───
+@Composable
+private fun EyeRelaxReminderV4(onDismiss: () -> Unit) {
+    var countdown by remember { mutableIntStateOf(20) }
+
+    LaunchedEffect(Unit) {
+        while (countdown > 0) {
+            delay(1000)
+            countdown--
+        }
+        delay(1000)
+        onDismiss()
+    }
+
+    val isUrgent = countdown <= 10
+    val ringColor = if (isUrgent) ColorLiveRed else Color(0xFF4FC3F7)
+
+    // Urgent pulse animation (last 10 seconds)
+    val urgentPulse by rememberInfiniteTransition(label = "urgentPulse").animateFloat(
+        initialValue = 1f,
+        targetValue = if (isUrgent) 0.6f else 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "urgentPulse"
+    )
+
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = Color(0xE60D0D0D),
+        shadowElevation = 16.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .drawBehind {
+                    drawRoundRect(
+                        color = ringColor.copy(alpha = 0.2f),
+                        cornerRadius = CornerRadius(20.dp.toPx()),
+                        style = Stroke(width = 1.5f)
+                    )
+                }
+                .padding(horizontal = 24.dp, vertical = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Eyes icon (Canvas draw)
+            Canvas(modifier = Modifier.size(if (isUrgent) (40 * urgentPulse).dp else 36.dp)) {
+                val color = ringColor
+                val cx = size.width / 2
+                val cy = size.height / 2
+                val w = size.width * 0.35f
+                val h = size.height * 0.2f
+                drawOval(
+                    color = color,
+                    topLeft = Offset(cx - w * 1.2f, cy - h / 2),
+                    size = Size(w, h),
+                    style = Stroke(width = 2f)
+                )
+                drawOval(
+                    color = color,
+                    topLeft = Offset(cx + w * 0.2f, cy - h / 2),
+                    size = Size(w, h),
+                    style = Stroke(width = 2f)
+                )
+            }
+
+            Text(
+                text = "20-20-20 护眼法则",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = ringColor
+            )
+            Text(
+                text = "请看向20英尺外持续20秒",
+                fontSize = 12.sp,
+                color = Color.White.copy(alpha = 0.9f),
+                textAlign = TextAlign.Center
+            )
+
+            // Countdown ring with last-10-sec red pulse
+            val progress = (20 - countdown) / 20f
+            Box(
+                modifier = Modifier.size(if (isUrgent) (48 * urgentPulse).dp else 48.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val strokeW = 3f
+                    val radius = (size.minDimension - strokeW) / 2
+                    drawCircle(
+                        color = Color(0xFF1E1E1E),
+                        radius = radius,
+                        style = Stroke(width = strokeW)
+                    )
+                    drawArc(
+                        color = ringColor,
+                        startAngle = -90f,
+                        sweepAngle = progress * 360f,
+                        useCenter = false,
+                        topLeft = Offset((size.width - radius * 2) / 2, (size.height - radius * 2) / 2),
+                        size = Size(radius * 2, radius * 2),
+                        style = Stroke(width = strokeW, cap = StrokeCap.Round)
+                    )
+                }
+                Text(
+                    text = "${ countdown }",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = ringColor
+                )
+            }
+
+            // Dismiss button
+            Text(
+                text = "知道了",
+                fontSize = 12.sp,
+                color = Color.White.copy(alpha = 0.7f),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFF1A1A1A))
+                    .clickable { onDismiss() }
+                    .padding(horizontal = 20.dp, vertical = 6.dp)
+            )
+        }
+    }
+}
+
+// ─── 9. Breathing Dot v4.0 (learning baseline animation) ───
+@Composable
+private fun BreathingDotV4(
+    progress: Float,
+    pulseTrigger: Int,
+    modifier: Modifier = Modifier
+) {
+    val breathe by rememberInfiniteTransition(label = "dotBreathe").animateFloat(
+        initialValue = 0.85f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2200, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "dotBreathe"
+    )
+
+    val ringPulse by rememberInfiniteTransition(label = "dotRing").animateFloat(
+        initialValue = 0.5f,
+        targetValue = 1.3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = EaseOutCubic),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "dotRing"
+    )
+
+    val ringAlpha by rememberInfiniteTransition(label = "dotAlpha").animateFloat(
+        initialValue = 0.6f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = EaseOutCubic),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "dotAlpha"
+    )
+
+    Box(
+        modifier = modifier.size(60.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Outer ring pulse
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val center = Offset(size.width / 2, size.height / 2)
+            drawCircle(
+                color = Color(0xFF4FC3F7).copy(alpha = ringAlpha * 0.3f),
+                radius = size.minDimension / 2 * ringPulse,
+                center = center,
+                style = Stroke(width = 1.5f)
+            )
+            // Inner breathing dot
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFF00E5FF).copy(alpha = 0.8f),
+                        Color(0xFF4FC3F7).copy(alpha = 0.3f),
+                        Color.Transparent
+                    ),
+                    center = center,
+                    radius = size.minDimension * 0.4f * breathe
+                ),
+                radius = size.minDimension * 0.2f * breathe,
+                center = center
+            )
+        }
+    }
+}
+
+// ─── 10. Emotion Particle Field ───
+@Composable
+private fun EmotionParticleField(
+    emotionColor: Color,
+    intensity: Float,
+    modifier: Modifier = Modifier
+) {
+    val particleCount = 12
+    val animPhase = rememberInfiniteTransition(label = "particlePhase")
+        .animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(20000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "particlePhase"
+        )
+
+    Canvas(modifier = modifier) {
+        for (i in 0 until particleCount) {
+            val seed = (i * 137.5f) % 360f
+            val px = size.width * (0.1f + 0.8f * ((seed + animPhase.value * 200f) % 100f) / 100f)
+            val py = size.height * (animPhase.value * 0.3f + (seed % 50f) / 100f) % (size.height * 0.5f)
+            val radius = 1.5f + 2f * ((seed % 30f) / 30f)
+            val alpha = (0.15f + 0.25f * intensity) * (0.5f + 0.5f * kotlin.math.sin(animPhase.value * 6.28f + seed).toFloat())
+
+            drawCircle(
+                color = emotionColor.copy(alpha = alpha),
+                radius = radius,
+                center = Offset(px, py)
+            )
+        }
+    }
+}
+
+// ─── Data Panel v4.0 (right side) ───
+@Composable
+private fun DataPanelV4(
+    emotionProbs: EmotionProbabilities,
+    positivityIndex: Int,
+    onDashboardClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxHeight()
+            .background(Color(0xFF0A0A0A))
+            .padding(horizontal = 12.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        // Top: Dashboard button
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            MiniCircleButtonV4(
+                label = "D",
+                backgroundColor = Color(0xCC1A1A1A),
+                onClick = onDashboardClick
+            )
+        }
+
+        // Positivity Index
+        PositivityIndexCompactV4(index = positivityIndex)
+
+        // Energy level row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                EmotionMiniStatV4("能量", emotionProbs.energyLevel(), Color(0xFFFFC107))
+                EmotionMiniStatV4("效价", ((emotionProbs.valence + 1f) * 50).toInt(), Color(0xFF4CAF50))
+        }
+
+        // Emotion Bars
+        EmotionBarsVerticalV4(
+            emotions = emotionProbs.sorted().take(5)
+        )
+    }
+}
+
+// ─── Learning Baseline Overlay v4.0 ───
+@Composable
+private fun LearningBaselineOverlayV4(
+    progress: Float,
+    count: Int,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = ColorGlassPanel
+    ) {
+        Column(
+            modifier = Modifier
+                .drawBehind {
+                    drawRoundRect(
+                        color = Color(0xFF4FC3F7).copy(alpha = 0.2f),
+                        cornerRadius = CornerRadius(14.dp.toPx()),
+                        style = Stroke(width = 1f)
+                    )
+                }
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = "学习中...",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White
+            )
+            Text(
+                text = "请面对摄像头保持自然",
+                fontSize = 10.sp,
+                color = Color(0xFFAAAAAA)
+            )
+            // Progress bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color(0xFF1E1E1E))
+            ) {
+                val animatedProgress by animateFloatAsState(
+                    targetValue = progress,
+                    animationSpec = spring(stiffness = 120f),
+                    label = "learnProgressV4"
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(animatedProgress.coerceIn(0f, 1f))
+                        .fillMaxHeight()
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFF4FC3F7), Color(0xFF00E5FF))
+                            )
+                        )
+                )
+            }
+            Text(
+                text = "$count / 600",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF00E5FF)
+            )
+        }
+    }
+}
+
+// ─── Diagnostic Overlay v4.0 ───
+@Composable
+private fun DiagnosticOverlayV4(
+    analyzer: AndroidCameraAnalyzer?,
+    modifier: Modifier = Modifier
+) {
+    if (analyzer == null) {
+        Surface(modifier = modifier, shape = RoundedCornerShape(8.dp), color = Color(0xCC1A1A1A)) {
+            Text(
+                text = "等待初始化...",
+                fontSize = 11.sp,
+                color = Color(0xFFFF8A65),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+            )
+        }
+        return
+    }
+    val diag by analyzer.diagnosticState.collectAsState()
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = Color(0xDD0E0E0E)
+    ) {
+        Column(
+            modifier = Modifier
+                .drawBehind {
+                    drawRoundRect(
+                        color = Color(0xFFFFC107).copy(alpha = 0.15f),
+                        cornerRadius = CornerRadius(10.dp.toPx()),
+                        style = Stroke(width = 1f)
+                    )
+                }
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Text(text = "[诊断]", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFC107))
+            Text(
+                text = if (diag.detectorCreated) "[OK] 检测器已创建" else "[--] 等待...",
+                fontSize = 10.sp,
+                color = if (diag.detectorCreated) ColorPositiveGreen else Color(0xFFFF8A65)
+            )
+            Text(
+                text = if (diag.cameraBound) "[OK] 摄像头已绑定" else "[--] 未绑定",
+                fontSize = 10.sp,
+                color = if (diag.cameraBound) ColorPositiveGreen else Color(0xFFFF8A65)
+            )
+            Text(
+                text = "帧:${diag.frameReceived} 脸:${diag.faceDetected}",
+                fontSize = 10.sp,
+                color = Color(0xFFBBBBBB)
+            )
+            if (diag.lastError != null) {
+                Text(text = "WARN: ${diag.lastError}", fontSize = 9.sp, color = ColorLiveRed)
+            }
+        }
+    }
+}
+
+// ─── Dominant Emotion Label v4.0 ───
+@Composable
+private fun DominantEmotionLabelV4(name: String, probability: Float) {
+    val emotionColor = emotionColorFromName(name)
 
     Surface(
         shape = RoundedCornerShape(18.dp),
@@ -851,34 +1460,7 @@ private fun DominantEmotionLabelV3(name: String, probability: Float) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            // 情绪图标 (Canvas 绘制)
-            Canvas(modifier = Modifier.size(24.dp)) {
-                val color = emotionColor
-                val cx = size.width / 2
-                val cy = size.height / 2
-                val r = size.minDimension / 2 * 0.8f
-                drawCircle(color = color, radius = r, style = Stroke(width = 1.5f))
-                // 眼睛
-                drawCircle(color = color, radius = r * 0.12f, Offset(cx - r * 0.3f, cy - r * 0.15f))
-                drawCircle(color = color, radius = r * 0.12f, Offset(cx + r * 0.3f, cy - r * 0.15f))
-                // 嘴 (根据情绪)
-                if (name == "微笑") {
-                    val path = androidx.compose.ui.graphics.Path().apply {
-                        moveTo(cx - r * 0.3f, cy + r * 0.2f)
-                        quadraticBezierTo(cx, cy + r * 0.5f, cx + r * 0.3f, cy + r * 0.2f)
-                    }
-                    drawPath(path, color, style = Stroke(width = 1.2f, cap = StrokeCap.Round))
-                } else {
-                    drawLine(color, Offset(cx - r * 0.2f, cy + r * 0.25f), Offset(cx + r * 0.2f, cy + r * 0.25f), 1.2f, StrokeCap.Round)
-                }
-            }
-
-            Text(
-                text = name,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = emotionColor
-            )
+            Text(text = name, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = emotionColor)
             Text(
                 text = "${(probability * 100).toInt()}%",
                 fontSize = 13.sp,
@@ -889,91 +1471,154 @@ private fun DominantEmotionLabelV3(name: String, probability: Float) {
     }
 }
 
-/**
- * v3.0: 学习基线提示 — 玻璃质感
- */
+// ─── Positivity Index Compact v4.0 ───
 @Composable
-private fun LearningBaselineOverlayV3(
-    progress: Float,
-    count: Int,
-    modifier: Modifier = Modifier
-) {
+private fun PositivityIndexCompactV4(index: Int) {
+    val indexColor = when {
+        index >= 70 -> Color(0xFF4CAF50)
+        index >= 40 -> Color(0xFFFFC107)
+        else -> Color(0xFF5C6BC0)
+    }
     Surface(
-        modifier = modifier,
         shape = RoundedCornerShape(14.dp),
-        color = Color(0xCC0A0A0A)
+        color = Color(0xCC141414)
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .drawBehind {
                     drawRoundRect(
-                        color = Color(0xFF4FC3F7).copy(alpha = 0.2f),
+                        color = indexColor.copy(alpha = 0.15f),
                         cornerRadius = CornerRadius(14.dp.toPx()),
                         style = Stroke(width = 1f)
                     )
                 }
+                .fillMaxWidth()
                 .padding(horizontal = 14.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = "学习表情基线中...",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFFEEEEEE)
-            )
-            Text(
-                text = "请面对摄像头保持自然状态",
-                fontSize = 11.sp,
-                color = Color(0xFF999999)
-            )
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(Color(0xFF1E1E1E))
-                ) {
-                    val animatedProgress by animateFloatAsState(
-                        targetValue = progress,
-                        animationSpec = spring(stiffness = Spring.StiffnessLow),
-                        label = "learningProgress"
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(animatedProgress.coerceIn(0f, 1f))
-                            .fillMaxHeight()
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(Color(0xFF4FC3F7), Color(0xFF00E5FF))
-                                )
-                            )
-                    )
-                }
-                Text(
-                    text = "$count",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF00E5FF)
+            Column {
+                Text(text = "积极指数", fontSize = 12.sp, color = Color(0xFF888888))
+                Text(text = "$index", fontSize = 36.sp, fontWeight = FontWeight.ExtraBold, color = indexColor)
+            }
+            Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                val animatedIndex by animateFloatAsState(
+                    targetValue = index / 100f,
+                    animationSpec = spring(stiffness = 120f),
+                    label = "positivityV4"
                 )
+                CircularProgressIndicator(
+                    progress = { animatedIndex },
+                    modifier = Modifier.size(48.dp),
+                    color = indexColor,
+                    trackColor = Color(0xFF1E1E1E),
+                    strokeWidth = 4.dp
+                )
+                Text(text = "$index", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
             }
         }
     }
 }
 
-/**
- * v3.0: 迷你圆形按钮 — 玻璃质感
- */
+// ─── Emotion Mini Stat v4.0 ───
 @Composable
-private fun MiniCircleButtonV3(
+private fun EmotionMiniStatV4(label: String, value: Int, color: Color) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = Color(0xCC141414),
+        modifier = Modifier.width(60.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 8.dp, horizontal = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(text = "$value", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = color)
+            Text(text = label, fontSize = 9.sp, color = Color(0xFF888888))
+        }
+    }
+}
+
+// ─── Emotion Bars Vertical v4.0 ───
+@Composable
+private fun EmotionBarsVerticalV4(
+    emotions: List<Triple<String, Float, Long>>
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = Color(0xCC141414)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            emotions.forEach { (name, prob, colorLong) ->
+                val color = Color(colorLong.toUInt())
+                val isTop = name == emotions.first().first
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = name,
+                        fontSize = 10.sp,
+                        color = if (isTop) color else Color(0xFFCCCCCC),
+                        fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier.width(28.dp)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(12.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .padding(horizontal = 4.dp)
+                    ) {
+                        val barFrac by animateFloatAsState(
+                            targetValue = prob.coerceIn(0f, 1f),
+                            animationSpec = spring(stiffness = 120f),
+                            label = "barV4"
+                        )
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            drawRoundRect(
+                                color = Color(0xFF1A1A1A),
+                                size = Size(size.width, size.height),
+                                cornerRadius = CornerRadius(size.height / 2)
+                            )
+                            if (barFrac > 0.01f) {
+                                drawRoundRect(
+                                    brush = Brush.horizontalGradient(
+                                        listOf(color.copy(alpha = 0.6f), color)
+                                    ),
+                                    size = Size(size.width * barFrac, size.height),
+                                    cornerRadius = CornerRadius(size.height / 2)
+                                )
+                                // Shimmer highlight
+                                drawRoundRect(
+                                    color = Color.White.copy(alpha = 0.08f),
+                                    size = Size(size.width * barFrac, size.height * 0.4f),
+                                    cornerRadius = CornerRadius(size.height / 2)
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        text = "${(prob * 100).toInt()}%",
+                        fontSize = 10.sp,
+                        color = if (isTop) color else Color(0xFF888888),
+                        fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.width(24.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ─── Mini Circle Button v4.0 ───
+@Composable
+private fun MiniCircleButtonV4(
     label: String,
     backgroundColor: Color,
     onClick: (() -> Unit)? = null
@@ -1005,506 +1650,24 @@ private fun MiniCircleButtonV3(
     }
 }
 
-/**
- * v3.0: 诊断叠加层 — 玻璃质感
- */
-@Composable
-private fun DiagnosticOverlayV3(
-    analyzer: AndroidCameraAnalyzer?,
-    modifier: Modifier = Modifier
-) {
-    if (analyzer == null) {
-        Box(modifier = modifier) {
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = Color(0xCC1A1A1A)
-            ) {
-                Text(
-                    text = "等待初始化...",
-                    fontSize = 11.sp,
-                    color = Color(0xFFFF8A65),
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                )
-            }
-        }
-        return
-    }
-    val diag by analyzer.diagnosticState.collectAsState()
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(10.dp),
-        color = Color(0xDD0E0E0E)
-    ) {
-        Column(
-            modifier = Modifier
-                .drawBehind {
-                    drawRoundRect(
-                        color = Color(0xFFFFC107).copy(alpha = 0.15f),
-                        cornerRadius = CornerRadius(10.dp.toPx()),
-                        style = Stroke(width = 1f)
-                    )
-                }
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            Text(
-                text = "[诊断]",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFFFFC107)
-            )
-            Text(
-                text = if (diag.detectorCreated) "[OK] 检测器已创建" else "[--] 检测器未创建",
-                fontSize = 10.sp,
-                color = if (diag.detectorCreated) Color(0xFF81C784) else Color(0xFFFF5252)
-            )
-            Text(
-                text = if (diag.cameraBound) "[OK] 摄像头已绑定" else "[--] 摄像头未绑定",
-                fontSize = 10.sp,
-                color = if (diag.cameraBound) Color(0xFF81C784) else Color(0xFFFF8A65)
-            )
-            Text(
-                text = "帧:${diag.frameReceived} 推理:${diag.inferenceDone} 人脸:${diag.faceDetected}",
-                fontSize = 10.sp,
-                color = Color(0xFFBBBBBB)
-            )
-            if (diag.lastError != null) {
-                Text(
-                    text = "WARN: ${diag.lastError}",
-                    fontSize = 9.sp,
-                    color = Color(0xFFFF5252)
-                )
-            }
-        }
-    }
-}
+// ════════════════════════════════════════════════════════════════════════
+//  HELPER FUNCTIONS
+// ════════════════════════════════════════════════════════════════════════
 
 /**
- * v3.0: 眼部放松提醒 — 20-20-20 法则
+ * v4.0: 根据情绪名称返回对应颜色
  */
-@Composable
-private fun EyeRelaxReminder(onDismiss: () -> Unit) {
-    // 倒计时
-    var countdown by remember { mutableIntStateOf(20) }
-
-    LaunchedEffect(Unit) {
-        while (countdown > 0) {
-            delay(1000)
-            countdown--
-        }
-        delay(1000)
-        onDismiss()
-    }
-
-    // 呼吸脉冲
-    val breathe by rememberInfiniteTransition(label = "relaxBreathe").animateFloat(
-        initialValue = 0.96f, targetValue = 1.04f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ), label = "relaxScale"
-    )
-
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = Color(0xE60D0D0D)
-    ) {
-        Column(
-            modifier = Modifier
-                .drawBehind {
-                    drawRoundRect(
-                        color = Color(0xFF4FC3F7).copy(alpha = 0.2f),
-                        cornerRadius = CornerRadius(20.dp.toPx()),
-                        style = Stroke(width = 1.5f)
-                    )
-                }
-                .padding(horizontal = 24.dp, vertical = 18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // 眼睛图标 (Canvas 绘制)
-            Canvas(
-                modifier = Modifier
-                    .size(36.dp * breathe)
-            ) {
-                val color = Color(0xFF4FC3F7)
-                val cx = size.width / 2
-                val cy = size.height / 2
-                val w = size.width * 0.35f
-                val h = size.height * 0.2f
-                // 左眼
-                drawOval(
-                    color = color,
-                    topLeft = Offset(cx - w * 1.2f, cy - h / 2),
-                    size = Size(w, h),
-                    style = Stroke(width = 2f)
-                )
-                // 右眼
-                drawOval(
-                    color = color,
-                    topLeft = Offset(cx + w * 0.2f, cy - h / 2),
-                    size = Size(w, h),
-                    style = Stroke(width = 2f)
-                )
-            }
-
-            Text(
-                text = "20-20-20 护眼法则",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF4FC3F7)
-            )
-
-            Text(
-                text = "请看向20英尺外",
-                fontSize = 13.sp,
-                color = Color(0xFFEEEEEE),
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "持续 ${countdown}s...",
-                fontSize = 12.sp,
-                color = Color(0xFF999999),
-                textAlign = TextAlign.Center
-            )
-
-            // 进度圆环
-            val progress = (20 - countdown) / 20f
-            Box(
-                modifier = Modifier.size(40.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val strokeW = 3f
-                    val radius = (size.minDimension - strokeW) / 2
-                    // 背景圆
-                    drawCircle(
-                        color = Color(0xFF1E1E1E),
-                        radius = radius,
-                        style = Stroke(width = strokeW)
-                    )
-                    // 进度弧
-                    drawArc(
-                        color = Color(0xFF4FC3F7),
-                        startAngle = -90f,
-                        sweepAngle = progress * 360f,
-                        useCenter = false,
-                        topLeft = Offset(
-                            (size.width - radius * 2) / 2,
-                            (size.height - radius * 2) / 2
-                        ),
-                        size = Size(radius * 2, radius * 2),
-                        style = Stroke(width = strokeW, cap = StrokeCap.Round)
-                    )
-                }
-            }
-
-            // 关闭按钮
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Color(0xFF1A1A1A),
-                modifier = Modifier.clickable { onDismiss() }
-            ) {
-                Text(
-                    text = "知道了",
-                    fontSize = 12.sp,
-                    color = Color(0xFFBBBBBB),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                )
-            }
-        }
-    }
+private fun emotionColorFromName(emotionName: String): Color = when (emotionName) {
+    "微笑" -> ColorSmile
+    "生气" -> ColorAngry
+    "中性" -> ColorNeutral
+    "思考" -> ColorThinking
+    "惊讶" -> ColorSurprise
+    "恐惧" -> ColorFear
+    "厌恶" -> ColorDisgust
+    else -> Color(0xFF00E5FF)
 }
 
-/**
- * v3.0: 底部迷你数据条 — 微笑概率波形
- */
-@Composable
-private fun BottomMiniWaveBar(
-    data: List<Float>,
-    modifier: Modifier = Modifier
-) {
-    val waveColor = Color(0xFF00E5FF)
-
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(10.dp),
-        color = Color(0x80000000)
-    ) {
-        Box(
-            modifier = Modifier
-                .drawBehind {
-                    drawRoundRect(
-                        color = Color(0xFF00E5FF).copy(alpha = 0.12f),
-                        cornerRadius = CornerRadius(10.dp.toPx()),
-                        style = Stroke(width = 1f)
-                    )
-                }
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-                .height(36.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                // 标签
-                Text(
-                    text = "微笑",
-                    fontSize = 10.sp,
-                    color = Color(0xFF888888),
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.width(24.dp)
-                )
-
-                // 波形图
-                Canvas(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                ) {
-                    if (data.size < 2) return@Canvas
-
-                    val maxPoints = 40
-                    val step = if (data.size > maxPoints) data.size / maxPoints else 1
-                    val displayData = data.filterIndexed { index, _ -> index % step == 0 }.take(maxPoints)
-
-                    val w = size.width
-                    val h = size.height
-                    val baseline = h * 0.85f
-
-                    // 基线
-                    drawLine(
-                        color = Color(0xFF222222),
-                        start = Offset(0f, baseline),
-                        end = Offset(w, baseline),
-                        strokeWidth = 0.5f
-                    )
-
-                    // 波形填充
-                    val path = androidx.compose.ui.graphics.Path()
-                    val wavePath = androidx.compose.ui.graphics.Path()
-
-                    displayData.forEachIndexed { index, value ->
-                        val x = (index.toFloat() / (displayData.size - 1).coerceAtLeast(1)) * w
-                        val y = baseline - value * (h * 0.7f)
-
-                        if (index == 0) {
-                            path.moveTo(x, y)
-                            wavePath.moveTo(x, baseline)
-                            wavePath.lineTo(x, y)
-                        } else {
-                            path.lineTo(x, y)
-                            wavePath.lineTo(x, y)
-                        }
-                    }
-
-                    // 闭合填充路径
-                    if (displayData.isNotEmpty()) {
-                        val lastX = w
-                        wavePath.lineTo(lastX, baseline)
-                        wavePath.close()
-
-                        // 半透明填充
-                        drawPath(
-                            wavePath,
-                            color = waveColor.copy(alpha = 0.1f)
-                        )
-
-                        // 波形线
-                        drawPath(
-                            path,
-                            waveColor,
-                            style = Stroke(width = 1.5f, cap = StrokeCap.Round)
-                        )
-
-                        // 末端点
-                        val lastValue = displayData.last()
-                        val lastY = baseline - lastValue * (h * 0.7f)
-                        drawCircle(
-                            color = waveColor,
-                            radius = 3f,
-                            center = Offset(lastX, lastY)
-                        )
-                        drawCircle(
-                            color = waveColor.copy(alpha = 0.3f),
-                            radius = 6f,
-                            center = Offset(lastX, lastY)
-                        )
-                    }
-                }
-
-                // 当前值
-                val currentValue = data.lastOrNull() ?: 0f
-                Text(
-                    text = "${(currentValue * 100).toInt()}%",
-                    fontSize = 11.sp,
-                    color = waveColor,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.width(28.dp)
-                )
-            }
-        }
-    }
-}
-
-/**
- * v3.0: 积极指数卡 — 玻璃质感
- */
-@Composable
-private fun PositivityIndexCompactV3(index: Int) {
-    val indexColor = when {
-        index >= 70 -> Color(0xFF4CAF50)
-        index >= 40 -> Color(0xFFFFC107)
-        else -> Color(0xFF5C6BC0)
-    }
-
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = Color(0xCC141414)
-    ) {
-        Row(
-            modifier = Modifier
-                .drawBehind {
-                    drawRoundRect(
-                        color = indexColor.copy(alpha = 0.15f),
-                        cornerRadius = CornerRadius(14.dp.toPx()),
-                        style = Stroke(width = 1f)
-                    )
-                }
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "积极指数",
-                    fontSize = 12.sp,
-                    color = Color(0xFF888888),
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = "$index",
-                    fontSize = 36.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = indexColor
-                )
-            }
-            // 右侧进度环
-            Box(
-                modifier = Modifier.size(48.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                val animatedIndex by animateFloatAsState(
-                    targetValue = index / 100f,
-                    animationSpec = spring(stiffness = Spring.StiffnessLow),
-                    label = "positivityAnim"
-                )
-                CircularProgressIndicator(
-                    progress = { animatedIndex },
-                    modifier = Modifier.size(48.dp),
-                    color = indexColor,
-                    trackColor = Color(0xFF1E1E1E),
-                    strokeWidth = 4.dp,
-                )
-                Text(
-                    text = "$index",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
-        }
-    }
-}
-
-/**
- * v3.0: 情绪柱状图 — 玻璃质感
- */
-@Composable
-private fun EmotionBarsVerticalV3(
-    emotions: List<Triple<String, Float, Long>>
-) {
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = Color(0xCC141414)
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp)
-        ) {
-            emotions.forEach { (name, prob, color) ->
-                val isTop = name == emotions.first().first
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 1.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = name,
-                        fontSize = 11.sp,
-                        color = if (isTop) Color(color.toUInt()) else Color(0xFFCCCCCC),
-                        fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal,
-                        modifier = Modifier.width(28.dp)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(14.dp)
-                            .clip(RoundedCornerShape(7.dp))
-                            .padding(horizontal = 4.dp)
-                    ) {
-                        val barFraction by animateFloatAsState(
-                            targetValue = prob.coerceIn(0f, 1f),
-                            animationSpec = spring(stiffness = Spring.StiffnessLow),
-                            label = "barAnim"
-                        )
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            val h = size.height
-                            val w = size.width
-                            // 背景
-                            drawRoundRect(
-                                color = Color(0xFF1A1A1A),
-                                size = Size(w, h),
-                                cornerRadius = CornerRadius(h / 2)
-                            )
-                            // 填充条
-                            if (barFraction > 0.01f) {
-                                val barBrush = Brush.horizontalGradient(
-                                    listOf(
-                                        Color(color.toUInt()).copy(alpha = 0.6f),
-                                        Color(color.toUInt())
-                                    )
-                                )
-                                drawRoundRect(
-                                    brush = barBrush,
-                                    size = Size(w * barFraction, h),
-                                    cornerRadius = CornerRadius(h / 2)
-                                )
-                                // 高光
-                                drawRoundRect(
-                                    color = Color.White.copy(alpha = 0.08f),
-                                    size = Size(w * barFraction, h * 0.4f),
-                                    cornerRadius = CornerRadius(h / 2)
-                                )
-                            }
-                        }
-                    }
-                    Text(
-                        text = "${(prob * 100).toInt()}%",
-                        fontSize = 10.sp,
-                        color = if (isTop) Color(color.toUInt()) else Color(0xFF888888),
-                        fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.width(28.dp)
-                    )
-                }
-            }
-        }
-    }
-}
+// ════════════════════════════════════════════════════════════════════════
+//  END OF FILE v4.0
+// ════════════════════════════════════════════════════════════════════════
