@@ -1,6 +1,8 @@
 package com.ykz200.smiletracker
 
 import android.util.Log
+import androidx.camera.core.CameraControl
+import androidx.camera.core.CameraInfo
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -121,6 +123,17 @@ fun PortraitCameraScreen(
     var previewView by remember { mutableStateOf<PreviewView?>(null) }
     var analyzer by remember { mutableStateOf<AndroidCameraAnalyzer?>(null) }
 
+    // ─── v5.1: 自动追脸变焦状态 ──—
+    /** 电影感 800ms easeInOut 变焦动画值 */
+    val faceZoom = remember { Animatable(1f) }
+    /** 脸在画面中的归一化位置 (用于平移) */
+    var faceCenterX by remember { mutableFloatStateOf(0.5f) }
+    var faceCenterY by remember { mutableFloatStateOf(0.5f) }
+    /** 视野中目标脸宽比 */
+    var faceWidthRatio by remember { mutableFloatStateOf(1f) }
+    /** 人脸丢失计时器 */
+    var noFaceFrames by remember { mutableIntStateOf(0) }
+
     // ─── v4.0 New State ───
     var showMinimalMode by remember { mutableStateOf(false) }
     var eyeStrainDetected by remember { mutableStateOf(false) }
@@ -195,6 +208,64 @@ fun PortraitCameraScreen(
             cameraReady = true
         } catch (e: Exception) {
             Log.e("PortraitScreenV4", "bind failed", e)
+        }
+    }
+
+    // ─── v5.1: 追脸变焦 — 只在用户注视 camera时平滑放大 ───
+    LaunchedEffect(analyzer) {
+        val a = analyzer ?: return@LaunchedEffect
+        a.faceTrackFlow.collect { track ->
+            if (track == null) {
+                noFaceFrames++
+                if (noFaceFrames > 15) {
+                    faceCenterX = 0.5f
+                    faceCenterY = 0.5f
+                    faceWidthRatio = 1f
+                    launch { faceZoom.animateTo(1f, tween(800, easing = EaseInOutCubic)) }
+                }
+            } else {
+                noFaceFrames = 0
+                faceCenterX = track.centerXf
+                faceCenterY = track.centerYf
+                faceWidthRatio = track.widthf
+                if (track.isLookingAtCamera) {
+                    // 注视时才平滑放大 (脸占画面 ~55%)
+                    val targetZoom = (0.55f / track.widthf).coerceIn(1f, 3.5f)
+                    launch { faceZoom.animateTo(targetZoom, tween(800, easing = EaseInOutCubic)) }
+                } else {
+                    // 没注视 (转头/侧脸) → 平滑回退全景
+                    launch { faceZoom.animateTo(1f, tween(800, easing = EaseInOutCubic)) }
+                }
+            }
+        }
+    }
+
+    // ─── v5.1: 追脸变焦 — 通过 CameraX CameraControl.setZoomRatio 实现
+    LaunchedEffect(analyzer) {
+        val a = analyzer ?: return@LaunchedEffect
+        var cameraControl: CameraControl? = null
+        var cameraInfo: CameraInfo? = null
+        // 等待 cameraInfo 可用 (最多等 5 秒)
+        for (i in 1..50) {
+            cameraControl = a.getCameraControl()
+            cameraInfo = a.getCameraInfo()
+            if (cameraControl != null && cameraInfo != null) break
+            delay(100)
+        }
+        val ctrl = cameraControl ?: return@LaunchedEffect
+        val info = cameraInfo ?: return@LaunchedEffect
+        // 读取摄像头支持的变焦范围
+        val maxZoom = info.zoomState.value?.maxZoomRatio ?: 5f
+        val minZoom = info.zoomState.value?.minZoomRatio ?: 1f
+        val safeZoom = if (maxZoom > 1.2f) maxZoom * 0.85f else 1f
+        while (true) {
+            val zoom = faceZoom.value
+            if (zoom in 1.05f..safeZoom) {
+                runCatching { ctrl.setZoomRatio(zoom.coerceIn(minZoom, safeZoom)) }
+            } else {
+                runCatching { ctrl.setZoomRatio(minZoom) }
+            }
+            delay(100)
         }
     }
 

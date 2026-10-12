@@ -18,7 +18,9 @@ import com.ykz200.smiletracker.domain.FaceAnalysis
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.datetime.Clock
@@ -43,15 +45,39 @@ import android.graphics.Bitmap
  *  - MediaPipe 推理超时保护 (防止冻结)
  *  - ImageProxy 使用 YUV 格式直接转换 (减少内存拷贝)
  */
+data class FaceTrack(
+    /** 人脸中心 x 坐标, 归一化 [0, 1], 相对图片左上角 */
+    val centerXf: Float,
+    /** 人脸中心 y 坐标, 归一化 [0, 1], 相对图片左上角 */
+    val centerYf: Float,
+    /** 人脸宽度 / 图片宽度 */
+    val widthf: Float,
+    /** 人脸高度 / 图片高度 */
+    val heightf: Float,
+    /** 是否正在注视 camera (基于头部朝向估算) */
+    val isLookingAtCamera: Boolean
+)
+
 class AndroidCameraAnalyzer(private val context: Context) {
 
     private var detector: FaceDetector? = null
     private var cameraProvider: ProcessCameraProvider? = null
+    private var camera: Camera? = null
+
+    /** 暴露 CameraInfo 给外部 (UI) 用于读取变焦范围 */
+    fun getCameraInfo(): CameraInfo? = camera?.cameraInfo
+
+    /** 暴露 CameraControl 给外部 (UI) 用于变焦 */
+    fun getCameraControl(): CameraControl? = camera?.cameraControl
     private var imageAnalyzer: ImageAnalysis? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     /** 最新推理结果给 UI 共用，replay = 1 确保 UI 快速拿到 */
     val latestFlow = MutableSharedFlow<FaceAnalysis>(replay = 1, extraBufferCapacity = 64)
+
+    /** 人脸位置追踪 — 驱动自动追脸缩放 */
+    private val _faceTrackFlow = MutableSharedFlow<FaceTrack?>(replay = 1, extraBufferCapacity = 8)
+    val faceTrackFlow: SharedFlow<FaceTrack?> = _faceTrackFlow
 
     /** 诊断状态 — UI 可观察以了解流水线状态 */
     private val _diagnosticState = MutableStateFlow(DiagnosticState())
@@ -69,6 +95,9 @@ class AndroidCameraAnalyzer(private val context: Context) {
     @Volatile private var prevFaceCenterY = 0f
     @Volatile private var prevFaceWidth = 0f
     @Volatile private var prevFaceHeight = 0f
+    // 前一帧估算的头部欧拉角 (用于注视判断)
+    @Volatile private var prevEstYaw = 0f
+    @Volatile private var prevEstPitch = 0f
 
     /**
      * 诊断数据类 — 用于判断学习计数为何卡 0
@@ -126,6 +155,16 @@ class AndroidCameraAnalyzer(private val context: Context) {
     }
 
     /**
+     * 估算头部是否朝向摄像头 (基于头部欧拉角)
+     *   - MediaPipe Face Detection 不直接输出 gaze, 但从 bounding box 位移可以估算
+     *   - 低 yaw (±15°内) + 低 pitch (±12°内) 视为注视
+     * 此函数已经将 estYaw/estPitch 计算完成后调用, 直接读取成员变量
+     */
+    private fun estimateGazeByPose(): Boolean {
+        return kotlin.math.abs(prevEstYaw) < 15f && kotlin.math.abs(prevEstPitch) < 12f
+    }
+
+    /**
      * 处理 MediaPipe 推理结果，提取 smilingProbability / eyeOpenProbability / headEulerAngle
      *
      * MediaPipe Face Detection 模型输出 classification list:
@@ -142,6 +181,10 @@ class AndroidCameraAnalyzer(private val context: Context) {
             prevFaceCenterY = 0f
             prevFaceWidth = 0f
             prevFaceHeight = 0f
+            prevEstYaw = 0f
+            prevEstPitch = 0f
+            // emit 追脸数据 (null = 无人脸, 回退到全景)
+            scope.launch { _faceTrackFlow.emit(null) }
             // 即使未检测到脸也 emit, 让 UI 知道流水线在跑
             scope.launch {
                 latestFlow.emit(
@@ -191,10 +234,51 @@ class AndroidCameraAnalyzer(private val context: Context) {
             prevFaceCenterY = cy
             prevFaceWidth = w
             prevFaceHeight = h
+            // 保存估算姿态角供注视判断使用
+            prevEstYaw = estYaw
+            prevEstPitch = estPitch
+
+            // ── 发射追脸追踪数据 (归一化坐标) ──
+            // MediaPipe 返回的人脸 bbox 像素值是基于推理输入图的
+            // 使用 mpImage 尺寸作为归一化基准 (fallback: 192x192 短距离模型标准输入)
+            val imgW = (mpImage?.width ?: 192).toFloat().coerceAtLeast(1f)
+            val imgH = (mpImage?.height ?: 192).toFloat().coerceAtLeast(1f)
+            val gazeOn = estimateGazeByPose()
+            val track = FaceTrack(
+                centerXf = (cx / imgW).coerceIn(0f, 1f),
+                centerYf = (cy / imgH).coerceIn(0f, 1f),
+                widthf  = (w / imgW).coerceIn(0f, 1f),
+                heightf = (h / imgH).coerceIn(0f, 1f),
+                isLookingAtCamera = gazeOn
+            )
+            scope.launch { _faceTrackFlow.emit(track) }
         } else {
             estPitch = 0f
             estYaw = 0f
             estRoll = 0f
+            // 首次检测到脸 → 默认不触发注视 (需要等第二帧姿态收敛)
+            prevEstYaw = 99f
+            prevEstPitch = 99f
+            // 首次检测到脸也发射一次 (用完整 bbox)
+            if (bbox != null) {
+                val cx = bbox.centerX().toFloat()
+                val cy = bbox.centerY().toFloat()
+                val w = bbox.width().toFloat()
+                val h = bbox.height().toFloat()
+                val imgW = (mpImage?.width ?: 192).toFloat().coerceAtLeast(1f)
+                val imgH = (mpImage?.height ?: 192).toFloat().coerceAtLeast(1f)
+                val gazeOn = estimateGazeByPose()
+                val track = FaceTrack(
+                    centerXf = (cx / imgW).coerceIn(0f, 1f),
+                    centerYf = (cy / imgH).coerceIn(0f, 1f),
+                    widthf  = (w / imgW).coerceIn(0f, 1f),
+                    heightf = (h / imgH).coerceIn(0f, 1f),
+                    isLookingAtCamera = gazeOn
+                )
+                scope.launch { _faceTrackFlow.emit(track) }
+            } else {
+                scope.launch { _faceTrackFlow.emit(null) }
+            }
         }
 
         val analysis = FaceAnalysis(
@@ -261,7 +345,7 @@ class AndroidCameraAnalyzer(private val context: Context) {
                     }
 
                 // 绑定到 lifecycle
-                cameraProvider?.bindToLifecycle(
+                camera = cameraProvider?.bindToLifecycle(
                     owner,
                     cameraSelector,
                     preview,
@@ -357,6 +441,7 @@ class AndroidCameraAnalyzer(private val context: Context) {
     /** 释放摄像头与 MediaPipe 资源 */
     fun release() {
         cameraProvider?.unbindAll()
+        camera = null
         detector?.close()
         detector = null
         isDetectorReady = false
