@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -48,38 +49,43 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 // ════════════════════════════════════════════════════════════════════════
-//  PortraitCameraScreen v5.0 — Liquid Glass HUD Over Camera Preview
+//  PortraitCameraScreen v6.0 — Aurora Glow HUD Over Camera Preview
 // ════════════════════════════════════════════════════════════════════════
 //
-//  v5.0 Upgrade:
-//   - Liquid Glass HUD panel with dynamic refraction highlights
-//   - EmotionColorRingV5: enhanced multi-layer ring + shimmer overlay
-//   - PostureGuideV5: refined indicator with glow effect
-//   - SmartHintBubbleV5: larger touch target + spring entrance
-//   - AmbientLightIndicatorV5: animated gradient transition
-//   - EnhancedLiveIndicatorV5: liquid glass glow halo + smoother pulse
-//   - WaveformBarV5: real-time waveform with flowing gradient
-//   - EyeRelaxReminderV5: circular outline with progress arc
-//   - BreathingDotV5: floating in 3D depth illusion
-//   - EmotionParticleFieldV5: aurora-reflective particles
-//   - Minimal Mode v5: double-tap with haptic-style visual feedback
-//   - Spring Physics v5: softer damping (stiffness=100, dampingRatio=0.7)
-//   - Transition: AnimatedVisibility with Liquid Glass crossfade
+//  v6.0 Upgrade "Aurora Glow":
+//   - Aurora-tinted color palette: AuroraGreen, SunsetOrange, NebulaPink, CosmicViolet
+//   - HolographicHUDPanel: liquidFlowV6 with AuroraGreen refraction
+//   - EmotionColorRingV6: slower breathe tween (2800ms), ringRotateV6 labels
+//   - EnhancedLiveIndicatorV6: livePulseV6/wavePulseV6/glowV6 labels
+//   - WaveformBarV6: 6-segment histogram with barV6 labels
+//   - BreathingDotV6: AuroraGreen tint, breathe 0.9-1.12, tween 2500ms
+//   - EmotionParticleField: 16 particles, 24000ms duration
+//   - MoodTemperatureIndicatorV6: arc gauge smile probability meter
+//   - SpringBreath: ultra-low stiffness spring for organic breathing
+//   - SpringSnappy: stiffness increased to 90f for crisper response
+//   - emotionColorV6: aurora-tinted color mapping function
 // ════════════════════════════════════════════════════════════════════════
 
-// ── v5.0 Liquid Glass Color Palette ──
-private val ColorBackgroundDeep    = Color(0xFF04040E)
-private val ColorGlassPanel        = Color(0xCC0C0C14).copy(alpha = 0.80f)
+// ── v6.0 Aurora Glow Color Palette ──
+private val ColorBackgroundDeep    = Color(0xFF030308)
+private val ColorGlassPanel        = Color(0xCC0C0C14).copy(alpha = 0.84f)
 private val ColorGlassBorderSubtle = Color.White.copy(alpha = 0.09f)
 private val ColorLiveRed           = Color(0xFFFF4060)
-private val ColorPositiveGreen     = Color(0xFF9ADBA8)
+private val ColorPositiveGreen     = Color(0xFF69F0AE)  // AuroraGreen
+private val ColorAuroraGlow        = Color(0xFF69F0AE)  // v6.0 Aurora Green primary glow
 private val ColorWarningYellow     = Color(0xFFFFD68A)
-private val ColorLiquidHighlight   = Color.White.copy(alpha = 0.06f)  // v5.0 液态高光
-private val ColorLiquidRefraction  = Color.White.copy(alpha = 0.015f) // v5.0 折射微光
+private val ColorLiquidHighlight   = Color.White.copy(alpha = 0.06f)
+private val ColorLiquidRefraction  = Color.White.copy(alpha = 0.015f)
+// Aurora palette from Dashboard.kt
+private val AuroraGreen   = Color(0xFF69F0AE)
+private val SunsetOrange  = Color(0xFFFFAB40)
+private val NebulaPink    = Color(0xFFFF80AB)
+private val CosmicViolet  = Color(0xFFB388FF)
 
-// ── v5.0 Spring Configuration — 更柔和的物理感 ──
-private val SpringSnappy = spring<Float>(stiffness = 100f)  // v5.0 更低刚度 更自然
+// ── v6.0 Spring Configuration — Aurora organic physics ──
+private val SpringSnappy = spring<Float>(stiffness = 90f)  // v6.0 crisper response
 private val SpringGentle = spring<Float>(stiffness = Spring.StiffnessLow)
+private val SpringBreath = spring<Float>(stiffness = Spring.StiffnessVeryLow)  // v6.0 organic breathing
 
 // ── Color Constants for Emotions ──
 private val ColorSmile    = Color(0xFF4CAF50)
@@ -625,12 +631,12 @@ private fun HolographicHUDPanel(
     ambientLight: Float,
     showMinimalMode: Boolean
 ) {
-    // v5.0: 液态流光动画
-    val liquidFlow = rememberInfiniteTransition(label = "liquidFlowV5")
+    // v6.0: 流光动画 — liquidFlowV6
+    val liquidFlow = rememberInfiniteTransition(label = "liquidFlowV6")
         .animateFloat(
             initialValue = 0f, targetValue = 1f,
             animationSpec = infiniteRepeatable(
-                animation = tween(6000, easing = LinearEasing),
+                animation = tween(7000, easing = LinearEasing),
                 repeatMode = RepeatMode.Restart
             ), label = "hudLiquidFlow"
         )
@@ -650,20 +656,35 @@ private fun HolographicHUDPanel(
                     )
                 )
                 .drawBehind {
-                    // v5.0: 液态折射光效
+                    // v6.0: 极光折射光效 with AuroraGreen
                     val flowX = size.width * liquidFlow.value
                     drawRect(
                         brush = Brush.linearGradient(
                             colors = listOf(
                                 Color.Transparent,
                                 ColorLiquidRefraction,
-                                ColorLiquidHighlight.copy(alpha = 0.5f),
+                                ColorAuroraGlow.copy(alpha = 0.4f),
                                 ColorLiquidRefraction,
+                                ColorAuroraGlow.copy(alpha = 0.15f),
                                 Color.Transparent
                             ),
                             start = Offset(flowX - size.width * 0.3f, 0f),
                             end = Offset(flowX + size.width * 0.15f, size.height)
                         )
+                    )
+                    // v6.0: secondary aurora refraction line
+                    val flowY2 = size.height * ((liquidFlow.value + 0.5f) % 1f)
+                    drawLine(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                ColorAuroraGlow.copy(alpha = 0.03f),
+                                Color.Transparent
+                            )
+                        ),
+                        start = Offset(flowX - size.width * 0.2f, flowY2),
+                        end = Offset(flowX + size.width * 0.4f, flowY2),
+                        strokeWidth = 1.dp.toPx()
                     )
                 }
         )
@@ -768,34 +789,34 @@ private fun EmotionColorRingV4(
     modifier: Modifier = Modifier
 ) {
     val ringColor = emotionColorFromName(emotionName)
-    val breathe by rememberInfiniteTransition(label = "ringBreatheV4").animateFloat(
+    val breathe by rememberInfiniteTransition(label = "ringBreatheV6").animateFloat(
         initialValue = 0.96f,
         targetValue = 1.04f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2500, easing = EaseInOutSine),
+            animation = tween(2800, easing = EaseInOutSine),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "breatheV4"
+        label = "breatheV6"
     )
 
-    val rotation by rememberInfiniteTransition(label = "ringRotateV4").animateFloat(
+    val rotation by rememberInfiniteTransition(label = "ringRotateV6").animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
             animation = tween(10000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "rotationV4"
+        label = "rotationV6"
     )
 
-    val rotationReverse by rememberInfiniteTransition(label = "ringRotateRevV4").animateFloat(
+    val rotationReverse by rememberInfiniteTransition(label = "ringRotateRevV6").animateFloat(
         initialValue = 360f,
         targetValue = 0f,
         animationSpec = infiniteRepeatable(
             animation = tween(14000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "rotationRevV4"
+        label = "rotationRevV6"
     )
 
     val animatedAlpha by animateFloatAsState(
@@ -934,6 +955,79 @@ private fun PostureGuideV4(
     }
 }
 
+// ─── 3b. Mood Temperature Indicator v6.0 (arc gauge for smile probability) ───
+@Composable
+private fun MoodTemperatureIndicatorV6(
+    smileProbability: Float,
+    modifier: Modifier = Modifier
+) {
+    // Color lerp from blue (cold/low smile) to yellow (warm/high smile)
+    val tempColor = lerp(
+        Color(0xFF42A5F5),  // cool blue
+        Color(0xFFFFD54F),  // warm yellow
+        smileProbability.coerceIn(0f, 1f)
+    )
+
+    val animatedProb by animateFloatAsState(
+        targetValue = smileProbability.coerceIn(0f, 1f),
+        animationSpec = SpringBreath,
+        label = "moodTempV6"
+    )
+
+    Canvas(
+        modifier = modifier.size(40.dp)
+    ) {
+        val strokeW = 3.dp.toPx()
+        val arcSize = Size(size.width - strokeW, size.height - strokeW)
+        val topLeft = Offset(strokeW / 2f, strokeW / 2f)
+
+        // Background arc track (270 degree sweep, starting from bottom-left)
+        drawArc(
+            color = Color.White.copy(alpha = 0.08f),
+            startAngle = 135f,
+            sweepAngle = 270f,
+            useCenter = false,
+            topLeft = topLeft,
+            size = arcSize,
+            style = Stroke(width = strokeW, cap = StrokeCap.Round)
+        )
+
+        // Filled arc representing smile probability with lerp color
+        drawArc(
+            brush = Brush.sweepGradient(
+                0f to Color(0xFF42A5F5),
+                0.5f to Color(0xFF66BB6A),
+                1f to Color(0xFFFFD54F),
+                center = Offset(size.width / 2, size.height / 2)
+            ),
+            startAngle = 135f,
+            sweepAngle = 270f * animatedProb,
+            useCenter = false,
+            topLeft = topLeft,
+            size = arcSize,
+            style = Stroke(width = strokeW, cap = StrokeCap.Round)
+        )
+
+        // Tiny indicator dot at the end of the arc
+        val endAngle = Math.toRadians((135f + 270f * animatedProb).toDouble())
+        val radius = size.width / 2 - strokeW / 2
+        val dotCx = size.width / 2 + radius * kotlin.math.cos(endAngle).toFloat()
+        val dotCy = size.height / 2 + radius * kotlin.math.sin(endAngle).toFloat()
+        drawCircle(
+            color = tempColor,
+            radius = strokeW * 0.8f,
+            center = Offset(dotCx, dotCy)
+        )
+
+        // Inner glow dot
+        drawCircle(
+            color = tempColor.copy(alpha = 0.4f),
+            radius = strokeW * 1.4f,
+            center = Offset(dotCx, dotCy)
+        )
+    }
+}
+
 // ─── 4. Smart Hint Bubble v4.0 ───
 @Composable
 private fun SmartHintBubbleV4(
@@ -1055,33 +1149,33 @@ private fun EnhancedLiveIndicatorV4(
     isVisible: Boolean,
     isActive: Boolean
 ) {
-    val pulse by rememberInfiniteTransition(label = "livePulseV5").animateFloat(
+    val pulse by rememberInfiniteTransition(label = "livePulseV6").animateFloat(
         initialValue = 0.4f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(1400, easing = EaseInOutSine),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "pulseV5"
+        label = "pulseV6"
     )
 
-    val waveAlpha by rememberInfiniteTransition(label = "wavePulseV5").animateFloat(
+    val waveAlpha by rememberInfiniteTransition(label = "wavePulseV6").animateFloat(
         initialValue = 0.8f,
         targetValue = 0f,
         animationSpec = infiniteRepeatable(
             animation = tween(2400, easing = EaseOutCubic),
             repeatMode = RepeatMode.Restart
         ),
-        label = "waveV5"
+        label = "waveV6"
     )
 
-    val glowPulse by rememberInfiniteTransition(label = "glowV5").animateFloat(
+    val glowPulse by rememberInfiniteTransition(label = "glowV6").animateFloat(
         initialValue = 0.2f,
         targetValue = 0.6f,
         animationSpec = infiniteRepeatable(
             animation = tween(2000, easing = EaseInOutSine),
             repeatMode = RepeatMode.Reverse
-        ), label = "glowV5"
+        ), label = "glowV6"
     )
 
     val dotColor = if (isActive) ColorLiveRed else Color(0xFFFF8A65)
@@ -1142,13 +1236,13 @@ private fun WaveformBarV4(
                 modifier = Modifier.width(24.dp)
             )
 
-            // 5-segment histogram
+            // 6-segment histogram (v6.0)
             Row(
                 modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                val segments = 5
+                val segments = 6
                 val segmentData = if (data.size >= segments) {
                     val step = data.size / segments
                     (0 until segments).map { i ->
@@ -1162,7 +1256,7 @@ private fun WaveformBarV4(
                     val animatedHeight by animateFloatAsState(
                         targetValue = value.coerceIn(0.05f, 1f),
                         animationSpec = spring(stiffness = 120f),
-                        label = "barV4_$index"
+                        label = "barV6_$index"
                     )
                     Box(
                         modifier = Modifier
@@ -1329,10 +1423,10 @@ private fun BreathingDotV4(
     modifier: Modifier = Modifier
 ) {
     val breathe by rememberInfiniteTransition(label = "dotBreathe").animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.15f,
+        initialValue = 0.9f,
+        targetValue = 1.12f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = EaseInOutSine),
+            animation = tween(2500, easing = EaseInOutSine),
             repeatMode = RepeatMode.Reverse
         ),
         label = "dotBreathe"
@@ -1375,7 +1469,7 @@ private fun BreathingDotV4(
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        Color(0xFF00E5FF).copy(alpha = 0.8f),
+                        AuroraGreen.copy(alpha = 0.8f),
                         Color(0xFF4FC3F7).copy(alpha = 0.3f),
                         Color.Transparent
                     ),
@@ -1396,13 +1490,13 @@ private fun EmotionParticleField(
     intensity: Float,
     modifier: Modifier = Modifier
 ) {
-    val particleCount = 12
+    val particleCount = 16
     val animPhase = rememberInfiniteTransition(label = "particlePhase")
         .animateFloat(
             initialValue = 0f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
-                animation = tween(20000, easing = LinearEasing),
+                animation = tween(24000, easing = LinearEasing),
                 repeatMode = RepeatMode.Restart
             ),
             label = "particlePhase"
@@ -1724,3 +1818,19 @@ private fun EmotionBarsVerticalV4(
 // ════════════════════════════════════════════════════════════════════════
 //  HELPER FUNCTIONS — 已拆分为 PortraitCameraHelpers.kt
 // ════════════════════════════════════════════════════════════════════════
+
+// ─── v6.0 emotionColorV6: aurora-tinted color mapping ───
+/**
+ * v6.0 Aurora Glow: Maps emotion names to aurora-tinted colors.
+ * Each emotion gets a distinct aurora palette hue for visual variety.
+ */
+internal fun emotionColorV6(emotionName: String): Color = when (emotionName) {
+    "微笑"   -> AuroraGreen        // Happy / positive — bright green
+    "生气"   -> NebulaPink         // Angry / intense — warm pink
+    "中性"   -> CosmicViolet       // Neutral / calm — soft violet
+    "思考"   -> CosmicViolet       // Thinking — deep violet
+    "惊讶"   -> SunsetOrange       // Surprise — energetic orange
+    "恐惧"   -> CosmicViolet       // Fear — muted violet
+    "厌恶"   -> SunsetOrange       // Disgust — murky orange
+    else     -> AuroraGreen        // Default — aurora green
+}

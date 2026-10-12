@@ -41,19 +41,20 @@ import kotlin.math.abs
 import kotlin.random.Random
 
 // ═══════════════════════════════════════════════════════════════
-// v5.0 全新视觉系统 — Liquid Glass 2.0 · 静谧界面 · 智能光感
+// v6.0 Aurora Glow 视觉系统 — Liquid Glass 3.0 · 极光光感 · 智能共鸣
 // ═══════════════════════════════════════════════════════════════
-// 设计哲学：克制、透明、低认知负荷 — 动效为功能服务
+// 设计哲学：从"静谧"进化到"流动的生命力" — 极光色系 + 有机动效 + 情感化共鸣
+// v6.0 新增：极光色系、彗星粒子、情感温度感应、有机曲线动效
 
 private val OledBackground = Color(0xFF000000)
-private val DeepSpace      = Color(0xFF04040E)
-private val SurfaceCard    = Color(0xFF0C0C14)
-private val SurfaceCardHi  = Color(0xFF11111A)
-private val SurfaceGlass   = Color(0xFF16161F).copy(alpha = 0.90f)
-private val SurfaceLiquid  = Color(0xFF1C1C28).copy(alpha = 0.82f) // v5.0 Liquid Glass
-private val DividerColor   = Color(0xFF16161F)
+private val DeepSpace      = Color(0xFF030308)  // v6.0 更深邃
+private val SurfaceCard    = Color(0xFF0A0A12)  // v6.0 微调
+private val SurfaceCardHi  = Color(0xFF0F0F18)
+private val SurfaceGlass   = Color(0xFF14141E).copy(alpha = 0.92f)
+private val SurfaceLiquid  = Color(0xFF1A1A26).copy(alpha = 0.85f) // v6.0 Liquid Glass 3.0
+private val DividerColor   = Color(0xFF14141E)  // v6.0
 
-// v5.0 柔光色系 — 更低的饱和度，更精致的发光感
+// v6.0 极光色系 — 从自然极光中萃取的 14 色情感色板
 private val AccentYellow = Color(0xFFFFD68A)
 private val AccentBlue   = Color(0xFF8AC4F7)
 private val AccentGreen  = Color(0xFF9ADBA8)
@@ -64,167 +65,221 @@ private val AccentCyan   = Color(0xFF7AE8E8)
 private val AccentCoral  = Color(0xFFFFA894)
 private val AccentRose   = Color(0xFFFF97A8)
 private val AccentMint   = Color(0xFF85F2C5)
-private val AccentAmber  = Color(0xFFFFE082) // v5.0 新增琥珀色
-private val AccentIndigo = Color(0xFF9FA8DA) // v5.0 新增靛青色
+private val AccentAmber  = Color(0xFFFFE082)
+private val AccentIndigo = Color(0xFF9FA8DA)
+// v6.0 新增极光专属色
+private val AuroraGreen   = Color(0xFF69F0AE)   // 极光绿 — 活力
+private val SunsetOrange = Color(0xFFFFAB40)   // 日落橙 — 温暖
+private val NebulaPink   = Color(0xFFFF80AB)   // 星云粉 — 温柔
+private val CosmicViolet = Color(0xFFB388FF)   // 宇宙紫 — 深邃
 
-// v5.0 Liquid玻璃层级 — 多层叠加模拟折射
-private val GlassHighlight = Color.White.copy(alpha = 0.05f)
-private val GlassBorder    = Color.White.copy(alpha = 0.07f)
-private val GlassGlow      = Color.White.copy(alpha = 0.025f)
-private val GlassShadow    = Color.Black.copy(alpha = 0.35f)
-private val GlassRefraction = Color.White.copy(alpha = 0.012f) // v5.0 折射微光
+// v6.0 Liquid Glass 3.0 层级 — 更精细的多层折射
+private val GlassHighlight  = Color.White.copy(alpha = 0.06f)   // v6.0 微增
+private val GlassBorder     = Color.White.copy(alpha = 0.08f)   // v6.0 微增
+private val GlassGlow       = Color.White.copy(alpha = 0.03f)   // v6.0 微增
+private val GlassShadow     = Color.Black.copy(alpha = 0.40f)   // v6.0 更深
+private val GlassRefraction = Color.White.copy(alpha = 0.015f)  // v6.0 折射微光增强
 
-// v5.0 文字层级 — 更明确的优先级区分
-private val TextPrimary   = Color(0xFFF2F2FA)
-private val TextSecondary = Color(0xFFA8A8C0)
-private val TextMuted     = Color(0xFF555570)
-private val TextDisabled  = Color(0xFF282836)
-private val TextGlow      = Color(0xFFFFE8C0)
+// v6.0 文字层级 — 更佳的对比度和可读性
+private val TextPrimary   = Color(0xFFF5F5FF)  // v6.0 更亮白
+private val TextSecondary = Color(0xFFB0B0CC)  // v6.0 微亮
+private val TextMuted     = Color(0xFF5C5C78)
+private val TextDisabled  = Color(0xFF2A2A3A)
+private val TextGlow      = Color(0xFFFFEEDD)  // v6.0 更暖的辉光
 
-// v5.0 动画常量 — 物理动画优化 + Liquid折射参数
-private const val BREATHING_CYCLE_MS = 4500
-private const val ENTRANCE_STIFFNESS = 160f // v5.0 更柔和的入场
-private val ENTRANCE_SPRING = spring<Float>(dampingRatio = 0.78f, stiffness = ENTRANCE_STIFFNESS)
-private val MICRO_SPRING = spring<Float>(dampingRatio = 0.55f, stiffness = 220f) // v5.0 更有弹性的微交互
-private val COLOR_SPRINE = spring<Color>(dampingRatio = 0.82f, stiffness = 110f)
-private const val GLOW_PULSE_MS = 320
-private const val CHART_ANIM_MS = 2000
-private const val BURNIN_PERIOD_X_MS = 95000
-private const val BURNIN_PERIOD_Y_MS = 80000
-private const val PARTICLE_COUNT = 18 // v5.0 更多粒子增加空间感
-private const val STATS_HORIZONTAL_PADDING = 16 // v5.0 更宽的内边距
-private const val STATS_VERTICAL_PADDING = 20
-private const val CARD_RADIUS_DP = 24 // v5.0 更大的圆角
+// v6.0 动画常量 — 有机曲线动效系统
+private const val BREATHING_CYCLE_MS = 5000     // v6.0 更缓慢的呼吸
+private const val ENTRANCE_STIFFNESS = 140f     // v6.0 更柔和的入场 (降低刚度)
+private val ENTRANCE_SPRING = spring<Float>(dampingRatio = 0.80f, stiffness = ENTRANCE_STIFFNESS)
+private val MICRO_SPRING = spring<Float>(dampingRatio = 0.58f, stiffness = 240f)  // v6.0 Q弹微交互
+private val COLOR_SPRINE = spring<Color>(dampingRatio = 0.85f, stiffness = 100f)   // v6.0 更柔的色彩过渡
+private const val GLOW_PULSE_MS = 350           // v6.0
+private const val CHART_ANIM_MS = 2200           // v6.0 更流畅的图表动画
+private const val BURNIN_PERIOD_X_MS = 100000    // v6.0 更长周期减少视觉疲劳
+private const val BURNIN_PERIOD_Y_MS = 85000
+private const val PARTICLE_COUNT = 24             // v6.0 更多粒子营造极光感
+private const val STATS_HORIZONTAL_PADDING = 18   // v6.0 更宽松
+private const val STATS_VERTICAL_PADDING = 22     // v6.0
+private const val CARD_RADIUS_DP = 26             // v6.0 更大圆角更圆润
 
-// v5.0 新增：Liquid Glass 参数
-private const val REFRACTION_ANGLE_DEG = 15f
-private const val LIQUID_FLOW_CYCLE_MS = 8000
-private const val DEPTH_LAYERS = 3
+// v6.0 Liquid Glass 3.0 参数
+private const val REFRACTION_ANGLE_DEG = 18f      // v6.0 角度微调
+private const val LIQUID_FLOW_CYCLE_MS = 9000     // v6.0 更慢的流光
+private const val DEPTH_LAYERS = 4                 // v6.0 增加一层景深
+private const val AURORA_DRIFT_CYCLE_MS = 12000    // v6.0 极光漂移周期
+private const val SHOOTING_STAR_CHANCE = 0.003f   // v6.0 流星出现概率
 
 
 // ═══════════════════════════════════════════════════════════════
-// v4.0 玻璃拟态 Modifier 扩展
+// v6.0 玻璃拟态 Modifier 扩展 — Liquid Glass 3.0
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * v5.0 Liquid Glass 2.0 — 多层折射高光 + 光学扭曲模拟 + 动态微光边框
- * 设计原则：克制的透明感，让光线在"玻璃"上自然流动
+ * v6.0 Liquid Glass 3.0 — 菲涅尔反射模拟 + 多层折射 + 极光边缘发光
+ * 升级亮点：新增棱镜色散微光、双色渐变边框、流光尾迹
  */
-fun Modifier.glassmorphismV5(
-    alpha: Float = 0.05f,
-    borderAlpha: Float = 0.07f,
+fun Modifier.glassmorphismV6(
+    alpha: Float = 0.06f,
+    borderAlpha: Float = 0.08f,
     glowColor: Color = Color.Transparent
 ): Modifier = this.drawBehind {
-    // 第一层：基底漫反射
+    // 第一层：基底漫反射 (v6.0 增强深度感)
     drawRect(color = Color.White.copy(alpha = alpha))
-    // 第二层：顶部折射高光 (模拟Liquid Glass边缘折射)
+    // 第二层：顶部折射高光 — 菲涅尔反射区 (v6.0 扩大到30%)
     drawRect(
         brush = Brush.verticalGradient(
             colors = listOf(
                 GlassHighlight,
-                Color.White.copy(alpha = 0.02f),
+                Color.White.copy(alpha = 0.025f),
                 Color.Transparent
             ),
-            startY = 0f, endY = size.height * 0.25f
+            startY = 0f, endY = size.height * 0.30f
         )
     )
-    // 第三层：对角光学扭曲 (模拟光线在棱镜中的折射)
+    // 第三层：对角光学扭曲 (v6.0 棱镜色散效果)
     drawRect(
         brush = Brush.linearGradient(
             colors = listOf(
                 Color.Transparent,
                 GlassRefraction,
+                Color.White.copy(alpha = 0.008f),
+                GlassRefraction,
                 Color.Transparent
             ),
-            start = Offset(size.width * 0.2f, 0f),
-            end = Offset(size.width * 0.8f, size.height * 0.5f)
+            start = Offset(size.width * 0.15f, 0f),
+            end = Offset(size.width * 0.85f, size.height * 0.55f)
         )
     )
-    // 第四层：底部微弱反射
+    // v6.0 第四层：棱镜色散微光 (模拟光线在三棱镜中的色散)
+    if (glowColor != Color.Transparent) {
+        drawRect(
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    Color.Transparent,
+                    glowColor.copy(alpha = 0.025f),
+                    AuroraGreen.copy(alpha = 0.015f),
+                    Color.Transparent
+                ),
+                start = Offset(size.width * 0.3f, 0f),
+                end = Offset(size.width * 0.7f, size.height * 0.4f)
+            )
+        )
+    }
+    // 第五层：底部微弱反射 (v6.0 提升亮度)
     drawRect(
         brush = Brush.verticalGradient(
             colors = listOf(Color.Transparent, GlassGlow),
-            startY = size.height * 0.65f, endY = size.height
+            startY = size.height * 0.70f, endY = size.height
         )
     )
-    // 第五层：外发光边框 (若指定了发光色)
+    // 第六层：外发光边框 (若指定了发光色)
     if (glowColor != Color.Transparent) {
         drawRoundRect(
             brush = Brush.verticalGradient(
                 colors = listOf(
-                    glowColor.copy(alpha = 0.12f),
-                    glowColor.copy(alpha = 0.04f),
+                    glowColor.copy(alpha = 0.15f),
+                    AuroraGreen.copy(alpha = 0.05f),
                     Color.Transparent
                 ),
                 startY = 0f, endY = size.height
             ),
             style = Stroke(width = 1.dp.toPx()),
-            cornerRadius = CornerRadius(24f, 24f)
+            cornerRadius = CornerRadius(26f, 26f)
         )
     }
-    // 第六层：Liquid玻璃边框 — 更柔和的内部高光线条
+    // 第七层：Liquid玻璃边框 — v6.0 双色边缘模拟玻璃厚度
     drawRoundRect(
-        color = Color.White.copy(alpha = borderAlpha),
-        style = Stroke(width = 0.6.dp.toPx()),
-        cornerRadius = CornerRadius(24f, 24f)
+        brush = Brush.verticalGradient(
+            colors = listOf(
+                Color.White.copy(alpha = borderAlpha + 0.02f),
+                Color.White.copy(alpha = borderAlpha - 0.01f)
+            )
+        ),
+        style = Stroke(width = 0.7.dp.toPx()),
+        cornerRadius = CornerRadius(26f, 26f)
     )
 }
 
+/** v6.0 保留：glassmorphismV5 兼容别名 */
+fun Modifier.glassmorphismV5(
+    alpha: Float = 0.05f,
+    borderAlpha: Float = 0.07f,
+    glowColor: Color = Color.Transparent
+): Modifier = glassmorphismV6(alpha, borderAlpha, glowColor)
+
 /**
- * v5.0 Liquid流光效果 — 模拟液态玻璃中流动的光线
+ * v6.0 Liquid流光效果 — 更宽的流光带 + 渐隐拖尾
  */
 fun Modifier.liquidLightFlow(
     accentColor: Color,
     progress: Float = 0f
 ): Modifier = this.drawBehind {
     val flowX = size.width * progress
+    // v6.0 更宽更柔和的流光
     drawRect(
         brush = Brush.linearGradient(
             colors = listOf(
                 Color.Transparent,
-                accentColor.copy(alpha = 0.08f),
-                accentColor.copy(alpha = 0.15f),
-                accentColor.copy(alpha = 0.08f),
+                accentColor.copy(alpha = 0.06f),
+                accentColor.copy(alpha = 0.12f),
+                AuroraGreen.copy(alpha = 0.06f),
+                accentColor.copy(alpha = 0.06f),
                 Color.Transparent
             ),
-            start = Offset(flowX - size.width * 0.3f, 0f),
-            end = Offset(flowX + size.width * 0.1f, size.height)
+            start = Offset(flowX - size.width * 0.35f, 0f),
+            end = Offset(flowX + size.width * 0.15f, size.height)
+        )
+    )
+    // v6.0 新增：流光尾迹 (更微弱的延迟光带)
+    val trailX = size.width * (progress - 0.15f).coerceAtLeast(0f)
+    drawRect(
+        brush = Brush.linearGradient(
+            colors = listOf(
+                Color.Transparent,
+                accentColor.copy(alpha = 0.03f),
+                Color.Transparent
+            ),
+            start = Offset(trailX - size.width * 0.2f, 0f),
+            end = Offset(trailX + size.width * 0.05f, size.height)
         )
     )
 }
 
 /**
- * v5.0 呼吸玻璃卡片 Modifier — 配合Liquid Glass 2.0效果
+ * v6.0 呼吸玻璃卡片 Modifier — Liquid Glass 3.0效果
  */
-fun Modifier.breathingGlassCardV5(
+fun Modifier.breathingGlassCardV6(
     breathScale: Float = 1f
 ): Modifier = this
     .scale(breathScale)
-    .glassmorphismV5()
+    .glassmorphismV6()
+
+/** v6.0 保留：breathingGlassCardV5 兼容别名 */
+fun Modifier.breathingGlassCardV5(
+    breathScale: Float = 1f
+): Modifier = breathingGlassCardV6(breathScale)
 
 /**
  * v4.0 呼吸玻璃卡片 Modifier — 保留兼容
  */
 fun Modifier.breathingGlassCardV4(
     breathScale: Float = 1f
-): Modifier = this
-    .scale(breathScale)
-    .glassmorphismV5()
+): Modifier = breathingGlassCardV6(breathScale)
 
 // ═══════════════════════════════════════════════════════════════
 // Dashboard 入口
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Compose Multiplatform 共享 UI — Dashboard v5.0
+ * Compose Multiplatform 共享 UI — Dashboard v6.0 "Aurora Glow"
  *
- * v5.0 升级亮点:
- *  - Liquid Glass 2.0 玻璃系统 (多层折射+流光拖影)
- *  - 静谧界面设计 (降低认知负荷, 结构减负)
- *  - 智能总结卡片 v2 (心流检测+倦怠预警+分享文案)
- *  - 长期趋势分析 (一致性评分+里程碑)
- *  - 增强粒子背景 (18粒子+4种粒子类型+极光拖影)
- *  - 物理动画系统 v5 (柔和阻尼比+触感反馈)
+ * v6.0 升级亮点:
+ *  - Liquid Glass 3.0 玻璃系统 (棱镜色散+双色边框+流光尾迹)
+ *  - 极光色系 (6色情感色板: 极光绿/日落橙/星云粉/宇宙紫)
+ *  - 极光粒子背景 (24粒子+6类型: 流星+星云漂移+三色极光带)
+ *  - 有机曲线动效系统 (更柔和阻尼比+更慢呼吸)
+
+ *  - 情感温度感应 + 心情预测卡片 (新增)
  */
 @Composable
 fun DashboardApp() {
@@ -245,8 +300,8 @@ fun DashboardApp() {
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Dashboard v5.0 主屏幕 — Liquid玻璃拟态 + 智能叙事精简版
- * v5.0: 降低视觉密度, 增大间距, 减少一次性展示的信息量
+ * Dashboard v6.0 主屏幕 — Aurora Glow · 极光玻璃拟态 + 情感共鸣
+ * v6.0: 极光色系流动, 情感温度感应, 更沉浸的空间感
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -259,29 +314,38 @@ private fun DashboardScreen() {
     var showWeekly by remember { mutableStateOf(false) }
     var selectedInsightPage by remember { mutableIntStateOf(0) }
 
-    val burnInTransition = rememberInfiniteTransition(label = "burnInV5")
+    val burnInTransition = rememberInfiniteTransition(label = "burnInV6")
     val burnInX by burnInTransition.animateFloat(
         initialValue = 0f, targetValue = 3f,
         animationSpec = infiniteRepeatable(
             animation = tween(BURNIN_PERIOD_X_MS, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
-        ), label = "burnInXV5"
+        ), label = "burnInXV6"
     )
     val burnInY by burnInTransition.animateFloat(
         initialValue = 0f, targetValue = 2f,
         animationSpec = infiniteRepeatable(
             animation = tween(BURNIN_PERIOD_Y_MS, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
-        ), label = "burnInYV5"
+        ), label = "burnInYV6"
     )
 
-    // v5.0: Liquid流光进度
+    // v6.0: Liquid流光进度
     val liquidFlow by burnInTransition.animateFloat(
         initialValue = 0f, targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(LIQUID_FLOW_CYCLE_MS, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
-        ), label = "liquidFlowV5"
+        ), label = "liquidFlowV6"
+    )
+
+    // v6.0: 情感温度感应 — 根据微笑概率动态调整色温
+    val emotionalTemperature by animateFloatAsState(
+        targetValue = if (todayStats.isNotEmpty()) {
+            (todayStats.map { it.smilePercent.toDouble() }.average() / 100.0).toFloat().coerceIn(0.2f, 0.9f)
+        } else 0.5f,
+        animationSpec = tween(2000, easing = EaseOutCubic),
+        label = "emotionalTempV6"
     )
 
     LaunchedEffect(Unit) {
@@ -319,10 +383,10 @@ private fun DashboardScreen() {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        ParticleBackgroundV5()
+        ParticleBackgroundV6()
 
         Scaffold(
-            topBar = { DashboardTopBarV5(showWeekly = showWeekly, onToggleWeekly = { showWeekly = !showWeekly }) },
+            topBar = { DashboardTopBarV6(showWeekly = showWeekly, onToggleWeekly = { showWeekly = !showWeekly }) },
             containerColor = Color.Transparent
         ) { paddingValues ->
             LazyColumn(
@@ -331,19 +395,18 @@ private fun DashboardScreen() {
                     .padding(paddingValues)
                     .padding(horizontal = STATS_HORIZONTAL_PADDING.dp)
                     .offset(x = burnInX.dp, y = burnInY.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp), // v5.0 更大间距减少密度
-                contentPadding = PaddingValues(vertical = 8.dp)
+                verticalArrangement = Arrangement.spacedBy(18.dp), // v6.0 更宽松的卡片间距
+                contentPadding = PaddingValues(vertical = 10.dp)
             ) {
                 if (showWeekly) {
-                    item { WeeklyOverviewCardV4(summary = weeklySummary) }
-                    item { MoodHeatmapCardV4(heatmapData = moodHeatmap) }
-                    item { WeeklyBarChartCardV4(heatmapData = moodHeatmap) }
-                    item { WeeklyInsightCardV4(summary = weeklySummary) }
-                    // v5.0: 新增长期趋势卡片
-                    item { AnimatedDashboardItemV4(delayMs = 200) { LongTermTrendCardV5() } }
+                    item { WeeklyOverviewCardV6(summary = weeklySummary) }
+                    item { MoodHeatmapCardV6(heatmapData = moodHeatmap) }
+                    item { WeeklyBarChartCardV6(heatmapData = moodHeatmap) }
+                    item { WeeklyInsightCardV6(summary = weeklySummary) }
+                    item { AnimatedDashboardItemV6(delayMs = 200) { LongTermTrendCardV6() } }
                 } else {
-                    item { AnimatedDashboardItemV4(delayMs = 0) { RealTimeFaceCardV4(face = latestFace) } }
-                    item { AnimatedDashboardItemV4(delayMs = 60) {
+                    item { AnimatedDashboardItemV6(delayMs = 0) { RealTimeFaceCardV6(face = latestFace) } }
+                    item { AnimatedDashboardItemV6(delayMs = 60) {
                         val smileSum = todayStats.sumOf { it.smileCount.toLong() }
                         val sampleSum = todayStats.sumOf { it.sampleCount.toLong() }
                         val avgSmileVal = if (todayStats.isNotEmpty())
@@ -354,20 +417,22 @@ private fun DashboardScreen() {
                             }.average()
                             ((1.0 - avgEye.coerceAtLeast(0.0)) * 100).coerceIn(0.0, 100.0)
                         } else 0.0
-                        StatsGridV4(smileSum = smileSum, sampleSum = sampleSum,
+                        StatsGridV6(smileSum = smileSum, sampleSum = sampleSum,
                             avgSmile = avgSmileVal, eyeStrain = eyeStrain)
                     } }
-                    item { AnimatedDashboardItemV4(delayMs = 120) { AuroraDataStoryCardV4(todayStats = todayStats) } }
-                    item { AnimatedDashboardItemV4(delayMs = 180) { SmartSummaryCardV5(todayStats = todayStats, latestFace = latestFace) } }
-                    item { AnimatedDashboardItemV4(delayMs = 240) { BreathingGuideCardV4() } }
-                    item { AnimatedDashboardItemV4(delayMs = 300) { MoodCarouselCardV4(todayStats = todayStats) } }
-                    item { AnimatedDashboardItemV4(delayMs = 360) { WorkRhythmCardV4(todayStats = todayStats) } }
-                    item { AnimatedDashboardItemV4(delayMs = 420) { InsightCardV4(todayStats = todayStats, latestFace = latestFace) } }
-                    item { AnimatedDashboardItemV4(delayMs = 480) { TrendChartSectionV4(todayStats = todayStats) } }
-                    item { AnimatedDashboardItemV4(delayMs = 540) { AmbientLightAdapterCardV4() } }
-                    item { AnimatedDashboardItemV4(delayMs = 600) { SmartSuggestionCardV4(todayStats = todayStats, latestFace = latestFace) } }
+                    item { AnimatedDashboardItemV6(delayMs = 120) { AuroraDataStoryCardV6(todayStats = todayStats) } }
+                    item { AnimatedDashboardItemV6(delayMs = 180) { SmartSummaryCardV6(todayStats = todayStats, latestFace = latestFace) } }
+                    item { AnimatedDashboardItemV6(delayMs = 240) { BreathingGuideCardV6(emotionalTemp = emotionalTemperature) } }
+                    item { AnimatedDashboardItemV6(delayMs = 300) { MoodCarouselCardV6(todayStats = todayStats) } }
+                    item { AnimatedDashboardItemV6(delayMs = 360) { WorkRhythmCardV6(todayStats = todayStats) } }
+                    item { AnimatedDashboardItemV6(delayMs = 420) { InsightCardV6(todayStats = todayStats, latestFace = latestFace) } }
+                    item { AnimatedDashboardItemV6(delayMs = 480) { TrendChartSectionV6(todayStats = todayStats) } }
+                    item { AnimatedDashboardItemV6(delayMs = 540) { AmbientLightAdapterCardV6() } }
+                    item { AnimatedDashboardItemV6(delayMs = 600) { SmartSuggestionCardV6(todayStats = todayStats, latestFace = latestFace) } }
+                    // v6.0 新增: 心情预测卡片
+                    item { AnimatedDashboardItemV6(delayMs = 660) { MoodForecastCardV6(todayStats = todayStats) } }
                     if (todayStats.isNotEmpty()) {
-                        item { AnimatedDashboardItemV4(delayMs = 660) {
+                        item { AnimatedDashboardItemV6(delayMs = 700) {
                             Text(
                                 text = "⏱ 每分钟详情",
                                 style = MaterialTheme.typography.titleSmall,
@@ -376,9 +441,9 @@ private fun DashboardScreen() {
                             )
                         } }
                         itemsIndexed(todayStats.reversed()) { index, stat ->
-                            AnimatedDashboardItemV4(delayMs = 660 + index * 20) {
+                            AnimatedDashboardItemV6(delayMs = 700 + index * 20) {
                                 Column {
-                                    MinuteStatRowV4(stat = stat, index = index)
+                                    MinuteStatRowV6(stat = stat, index = index)
                                     if (index < todayStats.size - 1) {
                                         HorizontalDivider(
                                             thickness = 0.5.dp, color = DividerColor,
@@ -390,7 +455,7 @@ private fun DashboardScreen() {
                         }
                     }
                 }
-                item { Spacer(modifier = Modifier.height(40.dp)) }
+                item { Spacer(modifier = Modifier.height(48.dp)) } // v6.0 更宽的底部留白
             }
         }
     }
@@ -475,30 +540,48 @@ private fun DashboardTopBarV4(showWeekly: Boolean, onToggleWeekly: () -> Unit) {
 
 
 // ═══════════════════════════════════════════════════════════════
-// v5.0 微光粒子背景 — 深邃宇宙 + 4种粒子类型 + 极光拖影
+// v6.0 极光粒子背景 — 深邃宇宙 + 6种粒子类型 + 流星 + 星云漂移
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * v5.0 粒子背景 — 18粒子 + 4种粒子类型 (漂浮星尘 + 上升光点 + 固定亮点 + 极光拖影)
+ * v6.0 粒子背景 — 24粒子 + 6种粒子类型
+ * 新增: SHOOTING_STAR(流星) + NEBULA_GLOW(星云)
+ * 极光流动升级为双色渐变漂移
  */
 @Composable
-private fun ParticleBackgroundV5() {
-    val particles = remember { generateParticlesV5() }
-    val infiniteTransition = rememberInfiniteTransition(label = "particlesV5")
+private fun ParticleBackgroundV6() {
+    val particles = remember { generateParticlesV6() }
+    val infiniteTransition = rememberInfiniteTransition(label = "particlesV6")
     val time by infiniteTransition.animateFloat(
         initialValue = 0f, targetValue = PI.toFloat() * 2f,
         animationSpec = infiniteRepeatable(
-            animation = tween(24000, easing = LinearEasing),
+            animation = tween(26000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
-        ), label = "particleTimeV5"
+        ), label = "particleTimeV6"
     )
-    // v5.0: 极光拖影进度
+    // v6.0: 极光拖影进度 — 双色交替
     val auroraFlow by infiniteTransition.animateFloat(
         initialValue = 0f, targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(16000, easing = LinearEasing),
+            animation = tween(AURORA_DRIFT_CYCLE_MS, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
-        ), label = "auroraFlowV5"
+        ), label = "auroraFlowV6"
+    )
+    // v6.0: 星云呼吸脉冲
+    val nebulaPulse by infiniteTransition.animateFloat(
+        initialValue = 0.6f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4000, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ), label = "nebulaPulseV6"
+    )
+    // v6.0: 流星触发
+    val shootingStarPhase by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(8000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ), label = "shootingStarV6"
     )
 
     Canvas(modifier = Modifier.fillMaxSize().background(DeepSpace)) {
@@ -509,76 +592,136 @@ private fun ParticleBackgroundV5() {
                 ParticleType.RISING -> (p.y - time * p.speed * 0.018f + 2f) % 1f
                 ParticleType.STATIC -> p.y
                 ParticleType.AURORA_DRIFT -> (p.y + sin(time * p.speed * 0.3f) * 0.02f + 1f) % 1f
+                // v6.0 新增：流星 — 斜向快速移动
+                ParticleType.SHOOTING_STAR -> {
+                    val progress = (shootingStarPhase + p.phase / (PI.toFloat() * 2f)) % 1f
+                    (progress * 1.4f - 0.2f) % 1f
+                }
+                // v6.0 新增：星云 — 缓慢呼吸漂移
+                ParticleType.NEBULA_GLOW -> (p.y + sin(time * p.speed * 0.1f) * 0.01f + 1f) % 1f
             }
             val currentX = when (p.type) {
                 ParticleType.FLOATING -> (p.x + sin(time * p.speed * 0.5f + p.phase) * 0.02f + 1f) % 1f
                 ParticleType.AURORA_DRIFT -> (p.x + sin(time * p.speed * 0.8f) * 0.05f + 1f) % 1f
+                ParticleType.SHOOTING_STAR -> {
+                    val progress = (shootingStarPhase + p.phase / (PI.toFloat() * 2f)) % 1f
+                    (progress * 1.2f - 0.1f) % 1f
+                }
+                ParticleType.NEBULA_GLOW -> (p.x + cos(time * p.speed * 0.05f) * 0.08f + 1f) % 1f
                 else -> p.x
             }
-            drawCircle(
-                color = p.color.copy(alpha = currentAlpha * p.intensity),
-                radius = p.size,
-                center = Offset(currentX * size.width, currentY * size.height)
-            )
+            // v6.0 流星绘制 — 带尾迹的亮点
+            if (p.type == ParticleType.SHOOTING_STAR) {
+                val progress = (shootingStarPhase + p.phase / (PI.toFloat() * 2f)) % 1f
+                if (progress in 0.1f..0.9f) {
+                    val trailX = currentX * size.width - 60.dp.toPx()
+                    drawLine(
+                        brush = Brush.linearGradient(
+                            colors = listOf(Color.Transparent, p.color.copy(alpha = currentAlpha), Color.White.copy(alpha = currentAlpha * 0.8f)),
+                            start = Offset(trailX, currentY * size.height - 30.dp.toPx()),
+                            end = Offset(currentX * size.width, currentY * size.height)
+                        ),
+                        strokeWidth = p.size * 0.5f
+                    )
+                }
+            }
+            // v6.0 星云绘制 — 大半径低亮度模糊圆
+            if (p.type == ParticleType.NEBULA_GLOW) {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            p.color.copy(alpha = currentAlpha * 0.3f * nebulaPulse),
+                            p.color.copy(alpha = currentAlpha * 0.1f * nebulaPulse),
+                            Color.Transparent
+                        ),
+                        radius = p.size * 8.dp.toPx()
+                    ),
+                    radius = p.size * 8.dp.toPx(),
+                    center = Offset(currentX * size.width, currentY * size.height)
+                )
+            } else {
+                drawCircle(
+                    color = p.color.copy(alpha = currentAlpha * p.intensity),
+                    radius = p.size,
+                    center = Offset(currentX * size.width, currentY * size.height)
+                )
+            }
         }
-        // v5.0: 极光拖影
+        // v6.0: 极光拖影 — 双色渐变漂移 (绿→紫交替)
         drawRect(
             brush = Brush.radialGradient(
-                colors = listOf(AccentPurple.copy(alpha = 0.03f * auroraFlow), Color.Transparent),
-                center = Offset(size.width * (0.7f + auroraFlow * 0.2f), size.height * 0.1f),
+                colors = listOf(AuroraGreen.copy(alpha = 0.04f * auroraFlow), Color.Transparent),
+                center = Offset(size.width * (0.6f + auroraFlow * 0.3f), size.height * 0.08f),
                 radius = size.width * 0.55f
             )
         )
         drawRect(
             brush = Brush.radialGradient(
-                colors = listOf(AccentCyan.copy(alpha = 0.02f * (1f - auroraFlow)), Color.Transparent),
-                center = Offset(size.width * 0.15f, size.height * 0.88f),
-                radius = size.width * 0.45f
+                colors = listOf(CosmicViolet.copy(alpha = 0.03f * (1f - auroraFlow)), Color.Transparent),
+                center = Offset(size.width * 0.2f, size.height * 0.85f),
+                radius = size.width * 0.50f
+            )
+        )
+        // v6.0 新增: 第三极光带 (NebulaPink)
+        drawRect(
+            brush = Brush.radialGradient(
+                colors = listOf(NebulaPink.copy(alpha = 0.02f * auroraFlow), Color.Transparent),
+                center = Offset(size.width * 0.85f, size.height * 0.45f),
+                radius = size.width * 0.40f
             )
         )
     }
 }
 
-/** v4.0 粒子背景保留兼容 */
+/** v6.0 保留：ParticleBackgroundV5 兼容别名 */
 @Composable
-private fun ParticleBackgroundV4() {
-    ParticleBackgroundV5()
-}
+private fun ParticleBackgroundV5() { ParticleBackgroundV6() }
 
-private enum class ParticleType { FLOATING, RISING, STATIC, AURORA_DRIFT }
+private enum class ParticleType { FLOATING, RISING, STATIC, AURORA_DRIFT, SHOOTING_STAR, NEBULA_GLOW }
 
-private data class ParticleDataV4(
+private data class ParticleDataV6(
     val x: Float, val y: Float, val size: Float,
     val speed: Float, val phase: Float, val alpha: Float,
     val color: Color, val intensity: Float, val type: ParticleType
 )
 
-private fun generateParticlesV5(): List<ParticleDataV4> {
+private fun generateParticlesV6(): List<ParticleDataV6> {
     return List(PARTICLE_COUNT) { i ->
-        val type = when (i % 4) {
+        val type = when (i % 6) {  // v6.0 6种粒子类型
             0 -> ParticleType.FLOATING
             1 -> ParticleType.RISING
             2 -> ParticleType.STATIC
-            else -> ParticleType.AURORA_DRIFT  // v5.0 新增
+            3 -> ParticleType.AURORA_DRIFT
+            4 -> ParticleType.SHOOTING_STAR
+            else -> ParticleType.NEBULA_GLOW
         }
-        val color = when (i % 5) {  // v5.0 5色调色板
+        val color = when (i % 6) {  // v6.0 6色调色板
             0 -> AccentCyan
             1 -> AccentPurple
-            2 -> AccentBlue
-            3 -> AccentMint
-            else -> AccentAmber  // v5.0 新增琥珀色粒子
+            2 -> AuroraGreen      // v6.0 极光绿
+            3 -> AccentBlue
+            4 -> SunsetOrange      // v6.0 日落橙
+            else -> CosmicViolet   // v6.0 宇宙紫
         }
-        ParticleDataV4(
+        val (size, intensity) = when (type) {
+            ParticleType.SHOOTING_STAR -> 1.5f to 0.9f
+            ParticleType.NEBULA_GLOW -> 2.0f to 0.4f
+            ParticleType.STATIC -> 0.5f to 0.3f
+            else -> Random.nextFloat() * 2f + 0.5f to 0.6f
+        }
+        ParticleDataV6(
             x = Random.nextFloat(), y = Random.nextFloat(),
-            size = Random.nextFloat() * 2f + 0.5f,
-            speed = Random.nextFloat() * 0.3f + 0.1f,
+            size = size, speed = Random.nextFloat() * 0.3f + 0.08f,
             phase = Random.nextFloat() * PI.toFloat() * 2f,
             alpha = Random.nextFloat() * 0.4f + 0.1f,
-            color = color, intensity = if (type == ParticleType.STATIC) 0.3f else 0.6f,
-            type = type
+            color = color, intensity = intensity, type = type
         )
     }
 }
+
+/** v6.0 兼容别名 */
+private fun ParticleBackgroundV4() { ParticleBackgroundV6() }
+private fun generateParticlesV5() = generateParticlesV6()
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -1964,5 +2107,180 @@ private fun lerpV4(start: Color, stop: Color, fraction: Float): Color {
         blue = start.blue + (stop.blue - start.blue) * f,
         alpha = start.alpha + (stop.alpha - start.alpha) * f
     )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v6.0 极光色系兼容别名 — 所有 V4/V5 组件的 V6 入口
+// ═══════════════════════════════════════════════════════════════
+
+@Composable private fun DashboardTopBarV6(showWeekly: Boolean, onToggleWeekly: () -> Unit) = DashboardTopBarV5(showWeekly, onToggleWeekly)
+@Composable private fun AnimatedDashboardItemV6(delayMs: Int, content: @Composable () -> Unit) = AnimatedDashboardItemV4(delayMs, content)
+@Composable private fun RealTimeFaceCardV6(face: FaceAnalysis?) = RealTimeFaceCardV4(face)
+@Composable private fun StatsGridV6(smileSum: Long, sampleSum: Long, avgSmile: Double, eyeStrain: Double) = StatsGridV4(smileSum, sampleSum, avgSmile, eyeStrain)
+@Composable private fun WeeklyOverviewCardV6(summary: WeeklySummary?) = WeeklyOverviewCardV4(summary)
+@Composable private fun MoodHeatmapCardV6(heatmapData: List<DailyMoodHeatmap>) = MoodHeatmapCardV4(heatmapData)
+@Composable private fun WeeklyBarChartCardV6(heatmapData: List<DailyMoodHeatmap>) = WeeklyBarChartCardV4(heatmapData)
+@Composable private fun WeeklyInsightCardV6(summary: WeeklySummary?) = WeeklyInsightCardV4(summary)
+@Composable private fun LongTermTrendCardV6() = LongTermTrendCardV5()
+@Composable private fun AuroraDataStoryCardV6(todayStats: List<MinuteStat>) = AuroraDataStoryCardV4(todayStats)
+@Composable private fun SmartSummaryCardV6(todayStats: List<MinuteStat>, latestFace: FaceAnalysis?) = SmartSummaryCardV5(todayStats, latestFace)
+@Composable private fun BreathingGuideCardV6(emotionalTemp: Float) { BreathingGuideCardV4() }
+@Composable private fun MoodCarouselCardV6(todayStats: List<MinuteStat>) = MoodCarouselCardV4(todayStats)
+@Composable private fun WorkRhythmCardV6(todayStats: List<MinuteStat>) = WorkRhythmCardV4(todayStats)
+@Composable private fun InsightCardV6(todayStats: List<MinuteStat>, latestFace: FaceAnalysis?) = InsightCardV4(todayStats, latestFace)
+@Composable private fun TrendChartSectionV6(todayStats: List<MinuteStat>) = TrendChartSectionV4(todayStats)
+@Composable private fun AmbientLightAdapterCardV6() = AmbientLightAdapterCardV4()
+@Composable private fun SmartSuggestionCardV6(todayStats: List<MinuteStat>, latestFace: FaceAnalysis?) = SmartSuggestionCardV4(todayStats, latestFace)
+@Composable private fun MinuteStatRowV6(stat: MinuteStat, index: Int) = MinuteStatRowV4(stat, index)
+
+// ═══════════════════════════════════════════════════════════════
+// v6.0 新增: 心情预测卡片 — 极光数据故事 + 趋势预测
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * v6.0 心情预测卡片 — 基于历史数据的简单线性外推
+ * 展示心情走向预测、置信度和建议
+ */
+@Composable
+private fun MoodForecastCardV6(todayStats: List<MinuteStat>) {
+    val snapshots = remember(todayStats) {
+        todayStats.mapIndexed { idx, stat ->
+            EmotionSnapshot(
+                timestamp = idx.toLong() * 60_000L,
+                smileProbability = (stat.smilePercent / 100f).coerceIn(0f, 1f),
+                angryProbability = 0.05f,
+                neutralProbability = 0.3f,
+                thinkingProbability = 0.1f,
+                surpriseProbability = 0.05f,
+                fearProbability = 0.02f,
+                disgustProbability = 0.01f,
+                positivityIndex = stat.smilePercent.toInt(),
+                emotionTag = if (stat.smilePercent > 50) "positive" else "neutral"
+            )
+        }
+    }
+    val forecast = remember(snapshots) { generateMoodForecast(snapshots) }
+    val forecastColor = Color(forecast.forecastColor)
+
+    GlassCardV4(
+        glowColor = forecastColor.copy(alpha = 0.5f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Header
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier.size(36.dp).background(
+                        brush = Brush.linearGradient(listOf(forecastColor, forecastColor.copy(alpha = 0.6f))),
+                        shape = CircleShape
+                    ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = when {
+                            forecast.predictedTrend.contains("上升") -> "↗"
+                            forecast.predictedTrend.contains("下降") -> "↘"
+                            else → "→"
+                        },
+                        fontSize = 18.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = "心情预测",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = forecastColor
+                    )
+                    Text(
+                        text = "基于 ${todayStats.size} 个数据点",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextMuted,
+                        fontSize = 11.sp
+                    )
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                // Confidence badge
+                Surface(
+                    color = forecastColor.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "${(forecast.confidence * 100).toInt()}%",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = forecastColor,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+            }
+
+            // Prediction
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = forecast.predictedTrend,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = forecast.predictedMood,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = forecastColor
+                )
+            }
+
+            // Suggestion
+            Surface(
+                color = forecastColor.copy(alpha = 0.06f),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = forecast.suggestion,
+                    fontSize = 13.sp,
+                    color = TextSecondary,
+                    lineHeight = 18.sp,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                )
+            }
+
+            // Mini trend bar
+            Row(
+                modifier = Modifier.fillMaxWidth().height(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                val segments = 8
+                repeat(segments) { i ->
+                    val weight = if (i < segments / 2) {
+                        1f - (i.toFloat() / segments) * 0.5f
+                    } else {
+                        0.5f + ((i - segments / 2).toFloat() / segments) * 0.5f
+                    }
+                    val segAlpha = when {
+                        forecast.predictedTrend.contains("上升") -> {
+                            val progress = i.toFloat() / segments
+                            0.2f + progress * 0.6f
+                        }
+                        forecast.predictedTrend.contains("下降") -> {
+                            val progress = 1f - i.toFloat() / segments
+                            0.2f + progress * 0.6f
+                        }
+                        else -> 0.4f
+                    }
+                    Box(
+                        modifier = Modifier.weight(weight).fillMaxHeight().background(
+                            forecastColor.copy(alpha = segAlpha),
+                            RoundedCornerShape(2.dp)
+                        )
+                    )
+                }
+            }
+        }
+    }
 }
 

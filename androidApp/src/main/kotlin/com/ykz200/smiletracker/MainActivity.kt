@@ -54,20 +54,21 @@ import kotlinx.coroutines.delay
 import java.util.concurrent.TimeUnit
 
 // ═══════════════════════════════════════════════════════════════
-// v5.0 色彩系统 — Liquid Glass 2.0 · 更精致的玻璃质感
+// v6.0 色彩系统 — Aurora Glow · 极光色系 · 4层景深
 // ═══════════════════════════════════════════════════════════════
 
-private val DeepSpaceBg     = Color(0xFF04040E)   // v5.0 更深邃
-private val WarmGold        = Color(0xFFFFD68A)   // v5.0 更柔和的暖金色
-private val LavenderPurple  = Color(0xFFCCB0EB)   // v5.0 更饱和的薰衣草
-private val GlassCard       = Color(0xFF0C0C14).copy(alpha = 0.88f)  // v5.0 更通透
-private val GlassBorder     = Color(0xFFFFD68A).copy(alpha = 0.18f)  // v5.0 更明显边框
-private val TextPrimary     = Color(0xFFF2F2FA)   // v5.0 更亮白
-private val TextSecondary   = Color(0xFFA8A8C0)   // v5.0 更柔和的次要文字
-private val TextMuted       = Color(0xFF555570)   // v5.0
-private val AccentPink      = Color(0xFFFF97A8)   // v5.0
-private val AccentCyan      = Color(0xFF7AE8E8)   // v5.0
-private val LiquidHighlight = Color.White.copy(alpha = 0.06f)  // v5.0 液态高光
+private val DeepSpaceBg     = Color(0xFF030308)   // v6.0 极光色系背景
+private val WarmGold        = Color(0xFFFFD68A)   // v6.0 暖金色
+private val LavenderPurple  = Color(0xFFCCB0EB)   // v6.0 薰衣草
+private val AuroraGlow      = Color(0xFF69F0AE)   // v6.0 极光绿 — 新增主色
+private val GlassCard       = Color(0xFF0C0C14).copy(alpha = 0.90f)  // v6.0 更不透明
+private val GlassBorder     = Color(0xFFFFD68A).copy(alpha = 0.20f)  // v6.0 更明显边框
+private val TextPrimary     = Color(0xFFF5F5FF)   // v6.0 更纯净白
+private val TextSecondary   = Color(0xFFB0B0CC)   // v6.0 更清晰次要文字
+private val TextMuted       = Color(0xFF555570)   // v6.0
+private val AccentPink      = Color(0xFFFF97A8)   // v6.0
+private val AccentCyan      = Color(0xFF7AE8E8)   // v6.0
+private val LiquidHighlight = Color.White.copy(alpha = 0.06f)  // v6.0 液态高光
 
 // ═══════════════════════════════════════════════════════════════
 // v4.0 应用状态机
@@ -301,6 +302,94 @@ private fun AppContent() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// v6.0 — 极光背景 (3色极光带: AuroraGreen / LavenderPurple / WarmGold)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * 极光缓慢流动渐变背景 — v6.0 Aurora Glow 版
+ * 3色极光带: AuroraGreen / LavenderPurple / WarmGold — 4层景深
+ */
+@Composable
+private fun AuroraBackgroundV6(alpha: Float = 1f) {
+    val auroraProgress by rememberInfiniteTransition(label = "auroraV6").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(10000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "auroraProgressV6"
+    )
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val w = size.width
+        val h = size.height
+
+        // 基础深色背景
+        drawRect(color = DeepSpaceBg)
+
+        // 极光层 1 — AuroraGreen (极光绿)
+        val offset1 = (w * 0.25f * kotlin.math.sin(auroraProgress.toDouble() * kotlin.math.PI * 2)).toFloat()
+        drawRect(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    AuroraGlow.copy(alpha = 0.07f * alpha),
+                    Color.Transparent
+                ),
+                center = Offset(x = (w * 0.5f + offset1).toFloat(), y = h * 0.25f),
+                radius = w * 0.5f
+            )
+        )
+
+        // 极光层 2 — LavenderPurple (薰衣草紫)
+        val offset2 = (w * 0.2f * kotlin.math.cos(auroraProgress.toDouble() * kotlin.math.PI * 2.0 + 1.5)).toFloat()
+        drawRect(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    LavenderPurple.copy(alpha = 0.05f * alpha),
+                    Color.Transparent
+                ),
+                center = Offset(x = (w * 0.4f + offset2), y = h * 0.65f),
+                radius = w * 0.45f
+            )
+        )
+
+        // 极光层 3 — WarmGold (暖金色)
+        val offset3 = (w * 0.15f * kotlin.math.sin(auroraProgress.toDouble() * kotlin.math.PI * 2.0 + 3.0)).toFloat()
+        drawRect(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    WarmGold.copy(alpha = 0.05f * alpha),
+                    Color.Transparent
+                ),
+                center = Offset(x = (w * 0.7f + offset3).toFloat(), y = h * 0.8f),
+                radius = w * 0.4f
+            )
+        )
+
+        // 顶部微光 — AuroraGlow
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    AuroraGlow.copy(alpha = 0.03f * alpha),
+                    Color.Transparent
+                ),
+                startY = 0f,
+                endY = h * 0.35f
+            )
+        )
+    }
+}
+
+/**
+ * v4.0 兼容别名 — 委托到 AuroraBackgroundV6
+ */
+@Composable
+private fun AuroraBackgroundV4(alpha: Float = 1f) {
+    AuroraBackgroundV6(alpha)
+}
+
+// ═══════════════════════════════════════════════════════════════
 // v4.0 — SplashScreen: Canvas动态绘制微笑Logo + 流光效果
 // ═══════════════════════════════════════════════════════════════
 
@@ -319,51 +408,51 @@ private fun SplashScreenV4(onFinished: () -> Unit) {
     var showPrivacyCard by remember { mutableStateOf(false) }
     var startBreathing by remember { mutableStateOf(false) }
 
-    // v5.0: 更柔和的绘制进度
+    // v6.0: 更柔和的绘制进度
     val drawProgress by animateFloatAsState(
         targetValue = 1f,
-        animationSpec = tween(1400, easing = EaseOutQuart), // v5.0 更慢更柔
-        label = "splashDrawProgressV5"
+        animationSpec = tween(1600, easing = EaseOutQuart), // v6.0 更慢更柔
+        label = "splashDrawProgressV6"
     )
 
-    // v5.0: 流光效果 — 更慢的速度
-    val flowProgress by rememberInfiniteTransition(label = "splashFlowV5").animateFloat(
+    // v6.0: 流光效果 — 更慢的速度
+    val flowProgress by rememberInfiniteTransition(label = "splashFlowV6").animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2500, easing = LinearEasing),
+            animation = tween(2700, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "splashFlowProgressV5"
+        label = "splashFlowProgressV6"
     )
 
-    // v5.0: 呼吸缩放 — 更柔和的振幅
-    val breatheScale by rememberInfiniteTransition(label = "splashBreatheV5").animateFloat(
+    // v6.0: 呼吸缩放 — 更柔和的振幅
+    val breatheScale by rememberInfiniteTransition(label = "splashBreatheV6").animateFloat(
         initialValue = 1f,
-        targetValue = 1.05f, // v5.0 更小振幅
+        targetValue = 1.045f, // v6.0 更小振幅
         animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = EaseInOutSine), // v5.0 更慢
+            animation = tween(2200, easing = EaseInOutSine), // v6.0 更慢
             repeatMode = RepeatMode.Reverse
         ),
-        label = "splashBreatheScaleV5"
+        label = "splashBreatheScaleV6"
     )
 
-    // v5.0: 卡片淡入 — 更平滑
+    // v6.0: 卡片淡入 — 更平滑
     val cardAlpha by animateFloatAsState(
         targetValue = if (showPrivacyCard) 1f else 0f,
-        animationSpec = tween(600, easing = EaseOutQuart), // v5.0 使用更柔和的缓动
-        label = "splashCardAlphaV5"
+        animationSpec = tween(800, easing = EaseOutQuart), // v6.0 使用更柔和的缓动
+        label = "splashCardAlphaV6"
     )
 
     val currentScale = if (startBreathing) breatheScale else 1f
 
-    // 控制时序: 1.2s绘制 → 0.5s呼吸 → 0.8s → 结束
+    // 控制时序: 1.4s绘制 → 0.6s呼吸 → 0.9s → 结束
     LaunchedEffect(Unit) {
-        delay(1200)   // 等待绘制完成
+        delay(1400)   // v6.0 等待绘制完成
         startBreathing = true
-        delay(500)    // 短暂呼吸
+        delay(600)    // v6.0 短暂呼吸
         showPrivacyCard = true
-        delay(800)    // 卡片淡入后结束
+        delay(900)    // v6.0 卡片淡入后结束
         onFinished()
     }
 
@@ -452,6 +541,7 @@ private fun SplashSmileLogoV4(
             colors = listOf(
                 WarmGold.copy(alpha = 0.2f),
                 WarmGold,
+                AuroraGlow,
                 LavenderPurple,
                 WarmGold.copy(alpha = 0.2f)
             ),
@@ -500,7 +590,7 @@ private fun SplashSmileLogoV4(
             )
             // 星光点
             drawCircle(
-                color = LavenderPurple.copy(alpha = eyeAlpha * 0.7f),
+                color = AuroraGlow.copy(alpha = eyeAlpha * 0.6f),
                 radius = strokeW * 0.2f,
                 center = Offset(cx + baseR * 0.1f, cy - baseR * 0.55f)
             )
@@ -533,7 +623,7 @@ private fun PrivacyHintCardV4(alpha: Float) {
             .shadow(8.dp, RoundedCornerShape(16.dp))
             .clip(RoundedCornerShape(16.dp))
             .background(GlassCard)
-            .border(1.dp, GlassBorder, RoundedCornerShape(16.dp))
+            .border(1.dp, AuroraGlow.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
             .padding(horizontal = 20.dp, vertical = 14.dp)
     ) {
         Row(
@@ -661,7 +751,7 @@ private fun OnboardingFlowV4(
 @Composable
 private fun valStepAnimTrigger(currentStep: Int) {
     LaunchedEffect(currentStep) {
-        // 每步重新触发动画
+        delay(100)   // v6.0: 100ms 延迟确保重组完成
     }
 }
 
@@ -673,9 +763,9 @@ private fun OnboardingWelcomeStepV4() {
     // Logo呼吸动画
     val breatheScale by rememberInfiniteTransition(label = "welcomeBreathe").animateFloat(
         initialValue = 1f,
-        targetValue = 1.08f,
+        targetValue = 1.06f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = EaseInOutSine),
+            animation = tween(2400, easing = EaseInOutSine),
             repeatMode = RepeatMode.Reverse
         ),
         label = "welcomeBreatheScale"
@@ -1209,85 +1299,6 @@ private fun SmileTrackerAppV4(onAllPermissionsGranted: () -> Unit) {
                 onNavigateToDashboard = { showDashboard = true }
             )
         }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// v4.0 — 极光背景 (重构为可复用组件)
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * 极光缓慢流动渐变背景 — v4.0 轻量版
- */
-@Composable
-private fun AuroraBackgroundV4(alpha: Float = 1f) {
-    val auroraProgress by rememberInfiniteTransition(label = "auroraV4").animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(10000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "auroraProgressV4"
-    )
-
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val w = size.width
-        val h = size.height
-
-        // 基础深色背景
-        drawRect(color = DeepSpaceBg)
-
-        // 极光层 1 — 暖金色
-        val offset1 = (w * 0.25f * kotlin.math.sin(auroraProgress.toDouble() * kotlin.math.PI * 2)).toFloat()
-        drawRect(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    WarmGold.copy(alpha = 0.06f * alpha),
-                    Color.Transparent
-                ),
-                center = Offset(x = (w * 0.5f + offset1).toFloat(), y = h * 0.25f),
-                radius = w * 0.5f
-            )
-        )
-
-        // 极光层 2 — 薰紫色
-        val offset2 = (w * 0.2f * kotlin.math.cos(auroraProgress.toDouble() * kotlin.math.PI * 2.0 + 1.5)).toFloat()
-        drawRect(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    LavenderPurple.copy(alpha = 0.05f * alpha),
-                    Color.Transparent
-                ),
-                center = Offset(x = (w * 0.4f + offset2), y = h * 0.65f),
-                radius = w * 0.45f
-            )
-        )
-
-        // 极光层 3 — 流光青
-        val offset3 = (w * 0.15f * kotlin.math.sin(auroraProgress.toDouble() * kotlin.math.PI * 2.0 + 3.0)).toFloat()
-        drawRect(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    AccentCyan.copy(alpha = 0.04f * alpha),
-                    Color.Transparent
-                ),
-                center = Offset(x = (w * 0.7f + offset3).toFloat(), y = h * 0.8f),
-                radius = w * 0.4f
-            )
-        )
-
-        // 顶部微光
-        drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(
-                    WarmGold.copy(alpha = 0.03f * alpha),
-                    Color.Transparent
-                ),
-                startY = 0f,
-                endY = h * 0.35f
-            )
-        )
     }
 }
 

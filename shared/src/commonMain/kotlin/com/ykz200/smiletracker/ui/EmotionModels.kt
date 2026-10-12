@@ -1,5 +1,8 @@
 package com.ykz200.smiletracker.ui
 
+import kotlin.math.abs
+import kotlin.math.ln
+
 /**
  * 情绪概率 — 对应输出的 Emotion 模型结果
  * 每种情绪一个 Float [0..1]
@@ -92,6 +95,7 @@ data class MoodEntry(
 
 /**
  * 情绪快照 — 某个时刻的完整情绪状态 (用于趋势分析)
+ * v6.0: 新增各情绪概率、积极指数、情绪标签字段
  */
 data class EmotionSnapshot(
     val timestamp: Long,
@@ -101,7 +105,16 @@ data class EmotionSnapshot(
     val eyeStrainLevel: Float,  // 眼部疲劳等级 [0..1]
     val headPosture: String,    // 头部姿态: "正视" / "低头" / "偏头"
     val valence: Float = 0f,    // 效价
-    val energyLevel: Int = 50   // 能量等级
+    val energyLevel: Int = 50,  // 能量等级
+    // v6.0 新增: 各情绪概率 (用于情感共鸣评分与极光色计算)
+    val angryProbability: Float = 0f,
+    val neutralProbability: Float = 0f,
+    val thinkingProbability: Float = 0f,
+    val surpriseProbability: Float = 0f,
+    val fearProbability: Float = 0f,
+    val disgustProbability: Float = 0f,
+    val positivityIndex: Int = 50,        // 积极指数 0-100
+    val emotionTag: String = "neutral"    // 情绪标签: "positive" / "neutral" / "negative"
 )
 
 /**
@@ -350,4 +363,127 @@ fun checkMilestones(totalDays: Int, totalSmiles: Int, currentStreak: Int): List<
     if (currentStreak >= 7) milestones.add("连续7天记录! 🔥")
     if (currentStreak >= 30) milestones.add("连续30天! 习惯养成 💪")
     return milestones
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v6.0 Aurora Glow — 新增智能模型
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * v6.0: 心情预测 — 基于历史趋势预测未来情绪走向
+ */
+data class MoodForecast(
+    val predictedTrend: String = "稳定",
+    val predictedMood: String = "中性",
+    val confidence: Float = 0.5f,
+    val suggestion: String = "保持当前节奏",
+    val forecastColor: Long = 0xFF9FA8DA
+)
+
+/**
+ * v6.0: 情感共鸣评分 — 评估用户情绪的多样性和平衡性 (0-100)
+ * 高分 = 情绪丰富且平衡; 低分 = 情绪单调或极端
+ */
+fun calculateEmotionalResonance(snapshots: List<EmotionSnapshot>): Int {
+    if (snapshots.size < 10) return 50
+    val emotions = listOf("微笑", "生气", "中性", "思考", "惊讶", "恐惧", "厌恶")
+    val weights = emotions.map { label ->
+        snapshots.map { snap ->
+            when (label) {
+                "微笑" -> snap.smileProbability
+                "生气" -> snap.angryProbability
+                "中性" -> snap.neutralProbability
+                "思考" -> snap.thinkingProbability
+                "惊讶" -> snap.surpriseProbability
+                "恐惧" -> snap.fearProbability
+                else -> snap.disgustProbability
+            }
+        }.average()
+    }
+    // Shannon entropy-based diversity score
+    val sum = weights.sum().coerceAtLeast(0.001)
+    val normalized = weights.map { it / sum }
+    val entropy = -normalized.filter { it > 0 }.sumOf { p -> p * ln(p) }
+    val maxEntropy = ln(weights.size.toDouble())
+    val diversityScore = (entropy / maxEntropy * 100).toInt().coerceIn(0, 100)
+
+    // Check extremeness (one emotion too dominant)
+    val maxWeight = weights.maxOrNull() ?: 0.0
+    val extremenessPenalty = if (maxWeight > 0.7) 20 else 0
+
+    return (diversityScore - extremenessPenalty).coerceIn(0, 100)
+}
+
+/**
+ * v6.0: 极光情绪色 — 根据情绪混合实时计算色彩
+ * 权重混合所有情绪对应的情感色
+ */
+fun auroraMoodColor(
+    smile: Float, angry: Float, neutral: Float,
+    thinking: Float, surprise: Float, fear: Float, disgust: Float
+): Long {
+    val colors = listOf(
+        0xFFFFD68A to smile,       // 微笑 → 金黄
+        0xFFFF6B6B to angry,       // 生气 → 红
+        0xFF9FA8DA to neutral,     // 中性 → 靛青
+        0xFFB388FF to thinking,    // 思考 → 宇宙紫
+        0xFFFFE082 to surprise,    // 惊讶 → 琥珀
+        0xFFFFAB40 to fear,        // 恐惧 → 日落橙
+        0xFFA1887F to disgust      // 厌恶 → 褐灰
+    )
+    var r = 0.0; var g = 0.0; var b = 0.0; var totalW = 0.0
+    colors.forEach { (col, w) ->
+        val rr = ((col shr 16) and 0xFF).toDouble()
+        val gg = ((col shr 8) and 0xFF).toDouble()
+        val bb = (col and 0xFF).toDouble()
+        r += rr * w; g += gg * w; b += bb * w; totalW += w
+    }
+    if (totalW < 0.001) return 0xFF9FA8DA
+    val ri = (r / totalW).toInt().coerceIn(0, 255)
+    val gi = (g / totalW).toInt().coerceIn(0, 255)
+    val bi = (b / totalW).toInt().coerceIn(0, 255)
+    return (0xFF000000 or (ri shl 16) or (gi shl 8) or bi).toLong()
+}
+
+/**
+ * v6.0: 心情预测引擎 — 简单线性趋势外推
+ */
+fun generateMoodForecast(snapshots: List<EmotionSnapshot>): MoodForecast {
+    if (snapshots.size < 10) return MoodForecast(confidence = 0.2f)
+    val recent = snapshots.takeLast(20)
+    val avgSmile = recent.map { it.smileProbability }.average()
+    val avgPositive = recent.map { it.positivityIndex }.average()
+    val moodSlope = recent.takeLast(10).map { it.smileProbability }.average() -
+                     recent.take(10).map { it.smileProbability }.average()
+
+    val trend = when {
+        moodSlope > 0.15 -> "上升趋势 ✨"
+        moodSlope < -0.15 -> "下降趋势 🌙"
+        else -> "稳定平衡 ⚖️"
+    }
+    val mood = when {
+        avgSmile > 0.7 -> "愉悦"
+        avgSmile > 0.4 -> "平静"
+        avgPositive > 60 -> "积极"
+        avgPositive < 40 -> "低落"
+        else -> "中性"
+    }
+    val suggestion = when {
+        moodSlope > 0.15 -> "情绪在上升! 保持当前活动"
+        moodSlope < -0.15 -> "情绪有所低落，建议起身活动"
+        avgSmile < 0.3 -> "今天微笑较少，试试听听音乐"
+        else -> "情绪稳定，继续保持"
+    }
+    val color = when {
+        moodSlope > 0.15 -> 0xFF69F0AE  // AuroraGreen
+        moodSlope < -0.15 -> 0xFF9FA8DA  // Indigo
+        else -> 0xFFFFD68A  // WarmGold
+    }
+    return MoodForecast(
+        predictedTrend = trend,
+        predictedMood = mood,
+        confidence = (0.4 + kotlin.math.abs(moodSlope) * 2).toFloat().coerceIn(0.2f, 0.9f),
+        suggestion = suggestion,
+        forecastColor = color
+    )
 }
