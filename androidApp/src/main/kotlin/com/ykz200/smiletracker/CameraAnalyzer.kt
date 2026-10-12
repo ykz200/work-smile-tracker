@@ -120,6 +120,38 @@ class AndroidCameraAnalyzer(private val context: Context) {
     private var boundPreviewView: PreviewView? = null
     @Volatile private var isPausedForLowBattery = false
 
+    // ── 工作时间窗口配置 ──
+    val WORK_HOUR_START = 8
+    val WORK_HOUR_END = 18
+
+    /** 当前是否在工作时间窗口内 (8:00-18:00) — UI 可观察以控制绑定 */
+    private val _workingHoursFlow = MutableStateFlow(false)
+    val workingHoursFlow: StateFlow<Boolean> = _workingHoursFlow.asStateFlow()
+
+    private var workingHoursJob: Job? = null
+
+    /** 判断当前时刻是否在工作时间窗口 [WORK_HOUR_START, WORK_HOUR_END) */
+    fun isWorkingHours(): Boolean {
+        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        return hour in WORK_HOUR_START until WORK_HOUR_END
+    }
+
+    /** 启动工作时间检查定时器 (每 30s 更新一次) */
+    private fun startWorkingHoursChecker() {
+        workingHoursJob?.cancel()
+        workingHoursJob = scope.launch {
+            while (isActive) {
+                _workingHoursFlow.value = isWorkingHours()
+                delay(30_000L)
+            }
+        }
+    }
+
+    private fun stopWorkingHoursChecker() {
+        workingHoursJob?.cancel()
+        workingHoursJob = null
+    }
+
     /**
      * 诊断数据类 — 用于判断学习计数为何卡 0
      */
@@ -495,10 +527,15 @@ class AndroidCameraAnalyzer(private val context: Context) {
         }
         context.registerReceiver(receiver, filter)
         isBatteryReceiverRegistered = true
+        // 同时启动工作时间定时器
+        startWorkingHoursChecker()
+        // 立即推一次当前状态
+        _workingHoursFlow.value = isWorkingHours()
     }
 
     /** 停止电量监控 */
     fun stopBatteryMonitor() {
+        stopWorkingHoursChecker()
         if (!isBatteryReceiverRegistered) return
         try {
             batteryReceiver?.let { context.unregisterReceiver(it) }

@@ -206,11 +206,15 @@ fun PortraitCameraScreen(
         }
     }
 
-    // ─── Step 2: Bind PreviewView to lifecycle ───
+    // ─── Step 2: Bind PreviewView to lifecycle (仅工作时间 + 电量正常时) ───
     LaunchedEffect(previewView, analyzer, bindTrigger) {
         val pv = previewView
         val a = analyzer
         if (pv == null || a == null) return@LaunchedEffect
+        // 电量低暂停期间不绑定
+        if (isBatteryPaused) return@LaunchedEffect
+        // 仅工作时间绑定
+        if (!a.isWorkingHours()) return@LaunchedEffect
         try {
             a.bindToLifecycle(lifecycleOwner, pv)
             a.rememberBinding(lifecycleOwner, pv)
@@ -221,11 +225,26 @@ fun PortraitCameraScreen(
         }
     }
 
-    // ─── v5.2: 收集电量信息 ───
+    // ─── v5.2: 收集电量 + 工作时间信息 ───
     LaunchedEffect(analyzer) {
         val a = analyzer ?: return@LaunchedEffect
         launch { a.batteryLevelFlow.collect { batteryLevel = it } }
         launch { a.isChargingFlow.collect { isCharging = it } }
+    }
+
+    // ─── v5.2: 工作时间窗口控制 (8:00-18:00) ───
+    LaunchedEffect(analyzer) {
+        val a = analyzer ?: return@LaunchedEffect
+        a.workingHoursFlow.collect { isWorking ->
+            if (isWorking && !isBatteryPaused) {
+                // 进入工作时间 → 触发绑定
+                bindTrigger++
+            } else if (!isWorking) {
+                // 离开工作时间 → 解绑省电
+                a.pauseForLowBattery()
+                cameraReady = false
+            }
+        }
     }
 
     // ─── v5.2: 低电量暂停, 充满恢复 ───
@@ -239,11 +258,11 @@ fun PortraitCameraScreen(
                 cameraReady = false
             }
         } else if (isCharging && batteryLevel >= 100 && isBatteryPaused) {
-            // 正在充电 + 电量 ≥ 100% → 恢复摄像头
-            if (isBatteryPaused) {
+            // 正在充电 + 电量 ≥ 100% → 恢复摄像头 (如果在工作时间内)
+            if (isBatteryPaused && a.isWorkingHours()) {
                 isBatteryPaused = false
                 a.resumeCameraIfPossible()
-                bindTrigger++  // 触发重新绑定
+                bindTrigger++
             }
         }
     }
