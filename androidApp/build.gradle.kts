@@ -25,7 +25,7 @@ android {
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION 17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     buildFeatures {
@@ -50,6 +50,36 @@ dependencies {
     // 引用 shared 模块的核心逻辑 + Compose UI
     implementation(project(":shared"))
 
-    // CameraX / MediaPipe / WorkManager 在 shared 这里已经声明，无需再写
-    // Android 专属的 MainActivity 启动由 shared 的 composeApp 承担
+    // androidx.core — NotificationCompat (SmileyAnalysisService 用)
+    implementation(libs.androidx.core.ktx)
+
+    // Compose BOM — androidApp使用AndroidX Compose
+    implementation(platform("androidx.compose:compose-bom:2024.12.01"))
+    implementation("androidx.compose.runtime:runtime")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.ui:ui")
+
+    // Compose Android 控件 + Activity 宿主
+    implementation(libs.compose.activity)
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // kotlinx-datetime (CameraAnalyzer 编译需要)
+    implementation(libs.kotlinx.datetime)
+
+    // SQLDelight Android Driver (MainActivity 编译需要)
+    implementation(libs.sqldelight.android.driver)
+
+    // CameraX (CameraAnalyzer 编译需要)
+    implementation(libs.camerax.core)
+    implementation(libs.camerax.camera2)
+    implementation(libs.camerax.lifecycle)
+    implementation(libs.camerax.view)
+
+    // MediaPipe Face Detection (CameraAnalyzer 编译需要)
+    implementation(libs.mediapipe.tasks.vision)
+
+    // WorkManager (SmileyAnalysisService 编译需要)
+    implementation(libs.workmanager.runtime)
 }

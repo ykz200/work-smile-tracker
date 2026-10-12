@@ -595,7 +595,7 @@ private fun AnimatedDashboardItemV4(delayMs: Int = 0, content: @Composable () ->
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn(tween(500, easing = EaseOutCubic)) + slideInVertically(
-            initialOffsetY = { it / 4 }, animationSpec = ENTRANCE_SPRING
+            initialOffsetY = { it / 4 }, animationSpec = spring(dampingRatio = 0.78f, stiffness = ENTRANCE_STIFFNESS)
         )
     ) { content() }
 }
@@ -824,8 +824,7 @@ private fun EmotionLabelAnimatedV4(face: FaceAnalysis) {
     AnimatedContent(
         targetState = face.isSmiling to (face.smileProbability >= 0.4f),
         transitionSpec = {
-            fadeIn(tween(400)) scaleIn(initialScale = 0.8f, animationSpec = spring(dampingRatio = 0.7f))
-                togetherWith fadeOut(tween(200)) scaleOut(targetScale = 0.8f, animationSpec = tween(200))
+            fadeIn(tween(400, easing = EaseOutCubic)) togetherWith fadeOut(tween(200))
         },
         label = "emotionLabelV4"
     ) { (smiling, pleasant) ->
@@ -1853,16 +1852,16 @@ private fun generateSmartSummaryV5(stats: List<MinuteStat>, face: FaceAnalysis?)
     return when {
         totalSmiles > 60 -> SmartSummary("🎉", "笑颜绽放日", "今日 $totalSmiles 次微笑",
             "今天是你笑得最多的一天！你的好心情也感染着身边的每一个人。分享快乐，让世界更美好 ✨",
-            AccentYellow, "今天笑了${totalSmiles}次！开心到飞起 😊", false, true)
+            AccentYellow, "今天笑了${totalSmiles}次！开心到飞起 😊", showShareButton = true)
         avgPct > 50 -> SmartSummary("😊", "心情不错", "微笑占比 ${"%.0f".format(avgPct)}%",
             "今天的心情指数偏高，保持这种积极的状态！如果可以，把你的好心情传递出去吧 💫",
-            AccentGreen, "心情美好的一天，正能量满满~", false, true)
+            AccentGreen, "心情美好的一天，正能量满满~", showShareButton = true)
         highStrainMins > 5 -> SmartSummary("⚠️", "注意休息", "检测到 $highStrainMins 次疲劳信号",
             "今天用眼强度偏高，记得多眨眼、远眺放松。健康的眼睛才能看到更多美好 👀",
-            AccentRose, "", false, false)
+            AccentRose, "", showShareButton = false)
         else -> SmartSummary("🌈", "平稳的一天", "各项指标正常",
             "今天的心率曲线很平稳，工作和生活节奏良好。继续记录，让数据见证你的成长!",
-            AccentCyan, "", false, false)
+            AccentCyan, "", showShareButton = false)
     }
 }
 

@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.sqldelight)
 }
@@ -8,7 +9,7 @@ kotlin {
     // Android 目标
     androidTarget {
         compilations.all {
-            kotlin {
+            kotlinOptions {
                 jvmTarget = "17"
             }
         }
@@ -29,11 +30,11 @@ kotlin {
     // ── 源集 ──
     sourceSets {
         commonMain.dependencies {
-            // Compose 共享 UI (这是双端共享的核心)
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.ui)
+            // Compose Multiplatform 共享 UI
+            implementation("org.jetbrains.compose.runtime:runtime:1.7.3")
+            implementation("org.jetbrains.compose.foundation:foundation:1.7.3")
+            implementation("org.jetbrains.compose.material3:material3:1.7.3")
+            implementation("org.jetbrains.compose.ui:ui:1.7.3")
 
             // SQLDelight 共享 + Flow
             implementation(libs.sqldelight.runtime)
@@ -43,6 +44,9 @@ kotlin {
 
             // Lifecycle ViewModel 共享
             implementation(libs.compose.lifecycle.runtime)
+
+            // kotlinx-datetime
+            implementation(libs.kotlinx.datetime)
         }
 
         androidMain.dependencies {
@@ -64,31 +68,42 @@ kotlin {
             // Compose Android 控件 + Activity 宿主
             implementation(libs.compose.activity)
             implementation(libs.compose.ui.tooling)
-            debugImplementation(libs.compose.ui.tooling.preview)
+            implementation(libs.compose.ui.tooling.preview)
+
+            // AndroidX core-ktx
+            implementation(libs.androidx.core.ktx)
         }
 
         iosMain.dependencies {
             // SQLDelight iOS 驱动
             implementation(libs.sqldelight.native.driver)
-            // iOS 端需要接入 MediaPipe C 库，此处占位
-            // XCode 工程里直接 pod 'MediaPipeTasksVision' 或 SPM MediaPipeTasksVision
         }
 
-        // 共享 tests (占位，双端共用测试)
         commonTest.dependencies {
             implementation(kotlin("test"))
         }
     }
 }
 
+// Android library 配置
+android {
+    namespace = "com.ykz200.smiletracker"
+    compileSdk = 35
+    defaultConfig {
+        minSdk = 26
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
 sqldelight {
     databases {
-        // 自定义 database name (数据库 package path: com.ykz200.smiletracker.db)
         create("SmileDatabase") {
             packageName.set("com.ykz200.smiletracker.db")
             schemaOutputDirectory.set(file("src/commonMain/sqldelight/schema"))
-            // 可选: 生成同步挂起函数 (suspend fun) 让 coroutines 直接消费
-            generateAsync.set(true)
+            generateAsync.set(false)
         }
     }
 }

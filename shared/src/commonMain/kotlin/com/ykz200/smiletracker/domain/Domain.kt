@@ -92,6 +92,6 @@ interface SmileRepository {
     suspend fun queryMinuteStats(startMillis: Long, endMillis: Long): List<MinuteStat>
     /** 获取最近一条采样 (用于 Dashboard 实时显示 "当前状态") */
     suspend fun getLatest(): FaceAnalysis?
-    /** 清理过期数据 (天为单位) — 可选实现, 默认空操作 */
-    fun cleanupOldData(retentionDays: Int = 90) = Unit
+    /** 清理过期数据 (天为单位) — 可选实现 */
+    fun cleanupOldData(retentionDays: Int = 90)
 }

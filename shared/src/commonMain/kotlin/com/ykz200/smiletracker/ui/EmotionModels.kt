@@ -243,12 +243,12 @@ fun generateSmartRecommendation(rhythm: WorkRhythm): String {
     val parts = mutableListOf<String>()
     
     rhythm.peakHour?.let { hour ->
-        val timeLabel = when {
-            hour < 12 -> "上午${hour}点"
-            hour < 18 -> "下午${hour - 12}点"
-            else -> "晚上${hour - 12}点"
+        val hourLabel = when {
+            hour < 12 -> "\u4e0a\u5348${hour}\u70b9"
+            hour < 18 -> "\u4e0b\u5348${hour - 12}\u70b9"
+            else -> "\u665a\u4e0a${hour - 12}\u70b9"
         }
-        parts.add("你在$timeLabel心情最好")
+        parts.add("\u4f60\u5728${hourLabel}\u5fc3\u60c5\u6700\u597d")
     }
     
     if (rhythm.avgMorningSmile > rhythm.avgAfternoonSmile) {

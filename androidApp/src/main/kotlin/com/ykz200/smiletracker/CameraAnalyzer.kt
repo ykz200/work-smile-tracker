@@ -96,7 +96,6 @@ class AndroidCameraAnalyzer(private val context: Context) {
             try {
                 val baseOptions = BaseOptions.builder()
                     .setModelAssetPath("face_detection_short_range.tflite")
-                    .setDelegate(BaseOptions.Delegate.CPU)
                     .build()
 
                 val options = FaceDetector.FaceDetectorOptions.builder()

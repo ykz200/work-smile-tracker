@@ -14,6 +14,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -166,14 +167,15 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun AppContent() {
+    val ctx = LocalContext.current
     // 全局状态
     var cameraGranted by remember { mutableStateOf(ContextCompat.checkSelfPermission(
-        LocalContext.current, Manifest.permission.CAMERA
+        ctx, Manifest.permission.CAMERA
     ) == PackageManager.PERMISSION_GRANTED) }
     var notifGranted by remember { mutableStateOf(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
-                LocalContext.current, Manifest.permission.POST_NOTIFICATIONS
+                ctx, Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
         } else true
     ) }
@@ -681,9 +683,7 @@ private fun OnboardingWelcomeStepV4() {
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.animateEnterExit(
-            enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 5 }
-        )
+        modifier = Modifier
     ) {
         // Logo
         Box(
@@ -739,9 +739,7 @@ private fun OnboardingWelcomeStepV4() {
 private fun OnboardingPrivacyStepV4() {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.animateEnterExit(
-            enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 5 }
-        )
+        modifier = Modifier
     ) {
         Text(
             text = "🔐 隐私优先",
@@ -835,9 +833,7 @@ private fun PrivacyIconRowV4(
 private fun OnboardingGetStartedStepV4() {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.animateEnterExit(
-            enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 5 }
-        )
+        modifier = Modifier
     ) {
         // 闪烁星光效果
         val sparkleAlpha by rememberInfiniteTransition(label = "sparkle").animateFloat(
@@ -1243,40 +1239,40 @@ private fun AuroraBackgroundV4(alpha: Float = 1f) {
         drawRect(color = DeepSpaceBg)
 
         // 极光层 1 — 暖金色
-        val offset1 = w * 0.25f * kotlin.math.sin(auroraProgress * kotlin.math.PI * 2)
+        val offset1 = (w * 0.25f * kotlin.math.sin(auroraProgress.toDouble() * kotlin.math.PI * 2)).toFloat()
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
                     WarmGold.copy(alpha = 0.06f * alpha),
                     Color.Transparent
                 ),
-                center = Offset(w * 0.5f + offset1, h * 0.25f),
+                center = Offset(x = (w * 0.5f + offset1).toFloat(), y = h * 0.25f),
                 radius = w * 0.5f
             )
         )
 
         // 极光层 2 — 薰紫色
-        val offset2 = w * 0.2f * kotlin.math.cos(auroraProgress * kotlin.math.PI * 2 + 1.5f)
+        val offset2 = (w * 0.2f * kotlin.math.cos(auroraProgress.toDouble() * kotlin.math.PI * 2.0 + 1.5)).toFloat()
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
                     LavenderPurple.copy(alpha = 0.05f * alpha),
                     Color.Transparent
                 ),
-                center = Offset(w * 0.4f + offset2, h * 0.65f),
+                center = Offset(x = (w * 0.4f + offset2), y = h * 0.65f),
                 radius = w * 0.45f
             )
         )
 
         // 极光层 3 — 流光青
-        val offset3 = w * 0.15f * kotlin.math.sin(auroraProgress * kotlin.math.PI * 2 + 3f)
+        val offset3 = (w * 0.15f * kotlin.math.sin(auroraProgress.toDouble() * kotlin.math.PI * 2.0 + 3.0)).toFloat()
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
                     AccentCyan.copy(alpha = 0.04f * alpha),
                     Color.Transparent
                 ),
-                center = Offset(w * 0.7f + offset3, h * 0.8f),
+                center = Offset(x = (w * 0.7f + offset3).toFloat(), y = h * 0.8f),
                 radius = w * 0.4f
             )
         )

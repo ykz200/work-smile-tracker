@@ -11,13 +11,7 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 
 /**
- * SQLDelight 生成的 DAO + coroutines adapter 帮我们把数据库操作挂到 Kotlin Flow
- * 这个类的实例由各端在 composition root 注入, 调用方不知道也不关心是 Android SQLite 还是 iOS SQLite
- *
- * v2 升级:
- *  - 新增 getDataRetentionDays 数据保留策略
- *  - insertSync 使用 scope 异步落盘避免主线程阻塞
- *  - 异常处理增强 (onFailure 不静默丢弃)
+ * SQLDelight 生成的 DAO + coroutines adapter
  */
 class SmileRepositoryImpl(
     private val database: SmileDatabase,
@@ -27,33 +21,32 @@ class SmileRepositoryImpl(
     private val queries = database.smileDatabaseQueries
 
     override suspend fun insert(face: FaceAnalysis) {
-        queries.insertRecord(
-            tsMillis = face.tsMillis,
-            smileProbability = face.smileProbability.toDouble(),
-            leftEyeOpenProbability = face.leftEyeOpenProbability.toDouble(),
-            rightEyeOpenProbability = face.rightEyeOpenProbability.toDouble(),
-            headPitch = face.headPitch.toDouble(),
-            headYaw = face.headYaw.toDouble(),
-            headRoll = face.headRoll.toDouble(),
-            rawData = null  // 启动阶段不存 raw_data, 节省存储
+        database.smileDatabaseQueries.insertRecord(
+            ts_millis = face.tsMillis,
+            smile_probability = face.smileProbability.toDouble(),
+            left_eye_open_probability = face.leftEyeOpenProbability.toDouble(),
+            right_eye_open_probability = face.rightEyeOpenProbability.toDouble(),
+            head_pitch = face.headPitch.toDouble(),
+            head_yaw = face.headYaw.toDouble(),
+            head_roll = face.headRoll.toDouble(),
+            raw_data = null
         )
     }
 
-    /** 同步写入 (WorkManager 后台任务中用, 脱离 suspend context) */
+    /** 同步写入 (WorkManager 后台任务中用) */
     fun insertSync(face: FaceAnalysis) {
         try {
-            queries.insertRecord(
-                tsMillis = face.tsMillis,
-                smileProbability = face.smileProbability.toDouble(),
-                leftEyeOpenProbability = face.leftEyeOpenProbability.toDouble(),
-                rightEyeOpenProbability = face.rightEyeOpenProbability.toDouble(),
-                headPitch = face.headPitch.toDouble(),
-                headYaw = face.headYaw.toDouble(),
-                headRoll = face.headRoll.toDouble(),
-                rawData = null
+            database.smileDatabaseQueries.insertRecord(
+                ts_millis = face.tsMillis,
+                smile_probability = face.smileProbability.toDouble(),
+                left_eye_open_probability = face.leftEyeOpenProbability.toDouble(),
+                right_eye_open_probability = face.rightEyeOpenProbability.toDouble(),
+                head_pitch = face.headPitch.toDouble(),
+                head_yaw = face.headYaw.toDouble(),
+                head_roll = face.headRoll.toDouble(),
+                raw_data = null
             )
         } catch (e: Exception) {
-            // 同步模式下不崩溃, 记录到日志
             System.err.println("[SmileRepository] insertSync failed: ${e.message}")
         }
     }
@@ -85,12 +78,12 @@ class SmileRepositoryImpl(
             val row = queries.selectLatestSample().executeAsOneOrNull() ?: return null
             FaceAnalysis(
                 tsMillis = row.ts_millis,
-                smileProbability = (row.smile_probability).toFloat(),
-                leftEyeOpenProbability = (row.left_eye_open_probability).toFloat(),
-                rightEyeOpenProbability = (row.right_eye_open_probability).toFloat(),
-                headPitch = (row.head_pitch).toFloat(),
-                headYaw = (row.head_yaw).toFloat(),
-                headRoll = (row.head_roll).toFloat()
+                smileProbability = row.smile_probability.toFloat(),
+                leftEyeOpenProbability = row.left_eye_open_probability.toFloat(),
+                rightEyeOpenProbability = row.right_eye_open_probability.toFloat(),
+                headPitch = row.head_pitch.toFloat(),
+                headYaw = row.head_yaw.toFloat(),
+                headRoll = row.head_roll.toFloat()
             )
         } catch (e: Exception) {
             System.err.println("[SmileRepository] getLatest failed: ${e.message}")
@@ -100,12 +93,11 @@ class SmileRepositoryImpl(
 
     /**
      * 清理过期数据 — 默认保留 90 天
-     * 建议在 WorkManager 中每周调用一次
      */
-    fun cleanupOldData(retentionDays: Int = 90) {
+    override fun cleanupOldData(retentionDays: Int) {
         try {
             val cutoff = Clock.System.now().toEpochMilliseconds() - (retentionDays * 24L * 3600L * 1000L)
-            queries.deleteOlderThan(cutoff)
+            database.smileDatabaseQueries.deleteOlderThan(cutoff)
         } catch (e: Exception) {
             System.err.println("[SmileRepository] cleanup failed: ${e.message}")
         }
@@ -123,11 +115,11 @@ class SmileRepositoryImpl(
             val peakStat = stats.maxByOrNull { it.maxSmile }
             val avgEye = stats.map {
                 (it.avgEyeLeft.coerceAtLeast(0f) + it.avgEyeRight.coerceAtLeast(0f)) / 2f
-            }.average()
-            val eyeStrainIdx = ((1.0 - avgEye.coerceAtLeast(0.0)) * 100).coerceIn(0f, 100f)
+            }.average().toFloat()
+            val eyeStrainIdx = ((1.0 - avgEye.toDouble()) * 100.0).toFloat().coerceIn(0f, 100f)
             val stressLvl = when {
-                eyeStrainIdx > 70 -> "高"
-                eyeStrainIdx > 40 -> "中"
+                eyeStrainIdx > 70f -> "高"
+                eyeStrainIdx > 40f -> "中"
                 else -> "低"
             }
             DailySummary(

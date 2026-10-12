@@ -1586,121 +1586,14 @@ private fun EmotionBarsVerticalV4(
             verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             emotions.forEach { (name, prob, colorLong) ->
-                val color = Color(colorLong.toUInt())
+                val color = Color(colorLong.toInt())
                 val isTop = name == emotions.first().first
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = name,
-                        fontSize = 10.sp,
-                        color = if (isTop) color else Color(0xFFCCCCCC),
-                        fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal,
-                        modifier = Modifier.width(28.dp)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(12.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .padding(horizontal = 4.dp)
-                    ) {
-                        val barFrac by animateFloatAsState(
-                            targetValue = prob.coerceIn(0f, 1f),
-                            animationSpec = spring(stiffness = 120f),
-                            label = "barV4"
-                        )
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            drawRoundRect(
-                                color = Color(0xFF1A1A1A),
-                                size = Size(size.width, size.height),
-                                cornerRadius = CornerRadius(size.height / 2)
-                            )
-                            if (barFrac > 0.01f) {
-                                drawRoundRect(
-                                    brush = Brush.horizontalGradient(
-                                        listOf(color.copy(alpha = 0.6f), color)
-                                    ),
-                                    size = Size(size.width * barFrac, size.height),
-                                    cornerRadius = CornerRadius(size.height / 2)
-                                )
-                                // Shimmer highlight
-                                drawRoundRect(
-                                    color = Color.White.copy(alpha = 0.08f),
-                                    size = Size(size.width * barFrac, size.height * 0.4f),
-                                    cornerRadius = CornerRadius(size.height / 2)
-                                )
-                            }
-                        }
-                    }
-                    Text(
-                        text = "${(prob * 100).toInt()}%",
-                        fontSize = 10.sp,
-                        color = if (isTop) color else Color(0xFF888888),
-                        fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.width(24.dp)
-                    )
-                }
+                EmotionBarRow(name, prob, color, isTop)
             }
         }
     }
 }
 
-// ─── Mini Circle Button v4.0 ───
-@Composable
-private fun MiniCircleButtonV4(
-    label: String,
-    backgroundColor: Color,
-    onClick: (() -> Unit)? = null
-) {
-    Surface(
-        modifier = Modifier
-            .size(36.dp)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-        shape = CircleShape,
-        color = backgroundColor
-    ) {
-        Box(
-            modifier = Modifier.drawBehind {
-                drawCircle(
-                    color = Color(0xFF888888).copy(alpha = 0.15f),
-                    radius = size.minDimension / 2,
-                    style = Stroke(width = 1f)
-                )
-            },
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = label,
-                fontSize = 11.sp,
-                color = Color(0xFFEEEEEE),
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-    }
-}
-
 // ════════════════════════════════════════════════════════════════════════
-//  HELPER FUNCTIONS
-// ════════════════════════════════════════════════════════════════════════
-
-/**
- * v4.0: 根据情绪名称返回对应颜色
- */
-private fun emotionColorFromName(emotionName: String): Color = when (emotionName) {
-    "微笑" -> ColorSmile
-    "生气" -> ColorAngry
-    "中性" -> ColorNeutral
-    "思考" -> ColorThinking
-    "惊讶" -> ColorSurprise
-    "恐惧" -> ColorFear
-    "厌恶" -> ColorDisgust
-    else -> Color(0xFF00E5FF)
-}
-
-// ════════════════════════════════════════════════════════════════════════
-//  END OF FILE v4.0
+//  HELPER FUNCTIONS — 已拆分为 PortraitCameraHelpers.kt
 // ════════════════════════════════════════════════════════════════════════
