@@ -1,6 +1,11 @@
 package com.ykz200.smiletracker
 
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -79,6 +84,14 @@ class AndroidCameraAnalyzer(private val context: Context) {
     private val _faceTrackFlow = MutableSharedFlow<FaceTrack?>(replay = 1, extraBufferCapacity = 8)
     val faceTrackFlow: SharedFlow<FaceTrack?> = _faceTrackFlow
 
+    /** 电池电量百分比 (0-100) — 供 UI 决策是否停止摄像头 */
+    private val _batteryLevelFlow = MutableStateFlow(100)
+    val batteryLevelFlow: StateFlow<Int> = _batteryLevelFlow.asStateFlow()
+
+    /** 是否正在充电(AC/USB/Wireless) */
+    private val _isChargingFlow = MutableStateFlow(false)
+    val isChargingFlow: StateFlow<Boolean> = _isChargingFlow.asStateFlow()
+
     /** 诊断状态 — UI 可观察以了解流水线状态 */
     private val _diagnosticState = MutableStateFlow(DiagnosticState())
     val diagnosticState: StateFlow<DiagnosticState> = _diagnosticState.asStateFlow()
@@ -98,6 +111,14 @@ class AndroidCameraAnalyzer(private val context: Context) {
     // 前一帧估算的头部欧拉角 (用于注视判断)
     @Volatile private var prevEstYaw = 0f
     @Volatile private var prevEstPitch = 0f
+
+    // ── 电池监控 ──
+    private var batteryReceiver: android.content.BroadcastReceiver? = null
+    private var isBatteryReceiverRegistered = false
+    // 保存绑定参数以便电量恢复后重新绑定
+    private var boundOwner: LifecycleOwner? = null
+    private var boundPreviewView: PreviewView? = null
+    @Volatile private var isPausedForLowBattery = false
 
     /**
      * 诊断数据类 — 用于判断学习计数为何卡 0
@@ -438,8 +459,82 @@ class AndroidCameraAnalyzer(private val context: Context) {
         }
     }
 
+    // ════════════════════════════════════════════════════════════════
+    // 电池监控 — 低电量暂停, 充满恢复
+    // ════════════════════════════════════════════════════════════════
+
+    /** 开始监控电量变化 (注册 ACTION_BATTERY_CHANGED receiver) */
+    fun startBatteryMonitor() {
+        if (isBatteryReceiverRegistered) return
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                intent ?: return
+                val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                val pct = if (level >= 0 && scale > 0) (level * 100 / scale) else 100
+                val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+                val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING
+                        || status == BatteryManager.BATTERY_STATUS_FULL
+                _batteryLevelFlow.value = pct
+                _isChargingFlow.value = isCharging
+            }
+        }
+        batteryReceiver = receiver
+        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        // 立即获取一次当前电量
+        val sticky = context.registerReceiver(receiver, filter)
+        if (sticky != null) {
+            val level = sticky.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = sticky.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            val pct = if (level >= 0 && scale > 0) (level * 100 / scale) else 100
+            val status = sticky.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+            val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING
+                    || status == BatteryManager.BATTERY_STATUS_FULL
+            _batteryLevelFlow.value = pct
+            _isChargingFlow.value = isCharging
+        }
+        context.registerReceiver(receiver, filter)
+        isBatteryReceiverRegistered = true
+    }
+
+    /** 停止电量监控 */
+    fun stopBatteryMonitor() {
+        if (!isBatteryReceiverRegistered) return
+        try {
+            batteryReceiver?.let { context.unregisterReceiver(it) }
+        } catch (_: Exception) {}
+        batteryReceiver = null
+        isBatteryReceiverRegistered = false
+    }
+
+    /** 因低电量暂停摄像头 (解绑但保留 provider 以便恢复) */
+    fun pauseForLowBattery() {
+        if (isPausedForLowBattery) return
+        isPausedForLowBattery = true
+        try {
+            cameraProvider?.unbindAll()
+            camera = null
+        } catch (_: Exception) {}
+    }
+
+    /** 电量恢复后重新绑定摄像头 */
+    fun resumeCameraIfPossible() {
+        if (!isPausedForLowBattery) return
+        val owner = boundOwner ?: return
+        val pv = boundPreviewView ?: return
+        isPausedForLowBattery = false
+        // 让 UI 层处理重新绑定 (调用 bindToLifecycle), 此处只需复位标志
+    }
+
+    /** 存储绑定参数 (在 bindToLifecycle 成功后被调用) */
+    fun rememberBinding(owner: LifecycleOwner, pv: PreviewView) {
+        boundOwner = owner
+        boundPreviewView = pv
+    }
+
     /** 释放摄像头与 MediaPipe 资源 */
     fun release() {
+        stopBatteryMonitor()
         cameraProvider?.unbindAll()
         camera = null
         detector?.close()

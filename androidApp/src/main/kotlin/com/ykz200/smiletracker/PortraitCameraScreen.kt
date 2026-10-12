@@ -3,6 +3,7 @@ package com.ykz200.smiletracker
 import android.util.Log
 import androidx.camera.core.CameraControl
 import androidx.camera.core.CameraInfo
+import androidx.camera.core.Preview as CameraPreview
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -134,6 +135,13 @@ fun PortraitCameraScreen(
     /** 人脸丢失计时器 */
     var noFaceFrames by remember { mutableIntStateOf(0) }
 
+    // ─── v5.2: 电池监控 — 低电量暂停 / 充满恢复 ───
+    var batteryLevel by remember { mutableIntStateOf(100) }
+    var isCharging by remember { mutableStateOf(false) }
+    var isBatteryPaused by remember { mutableStateOf(false) }
+    /** 触发重新绑定摄像头 (恢复时) */
+    var bindTrigger by remember { mutableIntStateOf(0) }
+
     // ─── v4.0 New State ───
     var showMinimalMode by remember { mutableStateOf(false) }
     var eyeStrainDetected by remember { mutableStateOf(false) }
@@ -199,15 +207,44 @@ fun PortraitCameraScreen(
     }
 
     // ─── Step 2: Bind PreviewView to lifecycle ───
-    LaunchedEffect(previewView, analyzer) {
+    LaunchedEffect(previewView, analyzer, bindTrigger) {
         val pv = previewView
         val a = analyzer
         if (pv == null || a == null) return@LaunchedEffect
         try {
             a.bindToLifecycle(lifecycleOwner, pv)
+            a.rememberBinding(lifecycleOwner, pv)
+            a.startBatteryMonitor()
             cameraReady = true
         } catch (e: Exception) {
             Log.e("PortraitScreenV4", "bind failed", e)
+        }
+    }
+
+    // ─── v5.2: 收集电量信息 ───
+    LaunchedEffect(analyzer) {
+        val a = analyzer ?: return@LaunchedEffect
+        launch { a.batteryLevelFlow.collect { batteryLevel = it } }
+        launch { a.isChargingFlow.collect { isCharging = it } }
+    }
+
+    // ─── v5.2: 低电量暂停, 充满恢复 ───
+    LaunchedEffect(analyzer, batteryLevel, isCharging) {
+        val a = analyzer ?: return@LaunchedEffect
+        if (!isCharging && batteryLevel <= 10) {
+            // 未充电 + 电量 ≤ 10% → 暂停摄像头
+            if (!isBatteryPaused) {
+                isBatteryPaused = true
+                a.pauseForLowBattery()
+                cameraReady = false
+            }
+        } else if (isCharging && batteryLevel >= 100 && isBatteryPaused) {
+            // 正在充电 + 电量 ≥ 100% → 恢复摄像头
+            if (isBatteryPaused) {
+                isBatteryPaused = false
+                a.resumeCameraIfPossible()
+                bindTrigger++  // 触发重新绑定
+            }
         }
     }
 
