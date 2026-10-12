@@ -39,8 +39,12 @@ android {
     }
 }
 
+// v6.0: 直接在运行的 JDK (21+) 编译，无需 toolchain 自动检测
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    kotlinOptions.jvmTarget = "17"
+}
+
 kotlin {
-    jvmToolchain(17)
     compilerOptions {
         freeCompilerArgs.add("-opt-in=androidx.compose.ui.ExperimentalComposeUiApi")
     }
