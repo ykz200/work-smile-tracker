@@ -49,43 +49,45 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 // ════════════════════════════════════════════════════════════════════════
-//  PortraitCameraScreen v6.0 — Aurora Glow HUD Over Camera Preview
+//  PortraitCameraScreen v7.0 — Zen绽放 · 柔和HUD + 智能色温
 // ════════════════════════════════════════════════════════════════════════
 //
-//  v6.0 Upgrade "Aurora Glow":
-//   - Aurora-tinted color palette: AuroraGreen, SunsetOrange, NebulaPink, CosmicViolet
-//   - HolographicHUDPanel: liquidFlowV6 with AuroraGreen refraction
-//   - EmotionColorRingV6: slower breathe tween (2800ms), ringRotateV6 labels
-//   - EnhancedLiveIndicatorV6: livePulseV6/wavePulseV6/glowV6 labels
-//   - WaveformBarV6: 6-segment histogram with barV6 labels
-//   - BreathingDotV6: AuroraGreen tint, breathe 0.9-1.12, tween 2500ms
-//   - EmotionParticleField: 16 particles, 24000ms duration
-//   - MoodTemperatureIndicatorV6: arc gauge smile probability meter
-//   - SpringBreath: ultra-low stiffness spring for organic breathing
-//   - SpringSnappy: stiffness increased to 90f for crisper response
-//   - emotionColorV6: aurora-tinted color mapping function
+//  v7.0 Upgrade "Zen绽放":
+//   - 色温自适应 HUD: 根据时间段(晨/午/晚)动态调整HUD色温
+//   - 柔和流光折射: liquidFlowV7 更慢的流光速度, 减少视觉疲劳
+//   - MoodWeatherIndicator: 迷你情绪天气指示器 (☀️/🌙/🌤等)
+//   - 暗色层次优化: 新增MistGray层, 卡片更柔和
+//   - 灵动中心环: 呼吸频率自适应 (检测到疲惫时变缓)
+//   - emotionColorV7: 更柔和的情绪色彩映射
 // ════════════════════════════════════════════════════════════════════════
 
-// ── v6.0 Aurora Glow Color Palette ──
-private val ColorBackgroundDeep    = Color(0xFF030308)
-private val ColorGlassPanel        = Color(0xCC0C0C14).copy(alpha = 0.84f)
-private val ColorGlassBorderSubtle = Color.White.copy(alpha = 0.09f)
-private val ColorLiveRed           = Color(0xFFFF4060)
-private val ColorPositiveGreen     = Color(0xFF69F0AE)  // AuroraGreen
-private val ColorAuroraGlow        = Color(0xFF69F0AE)  // v6.0 Aurora Green primary glow
+// ── v7.0 Zen绽放 Color Palette — 更柔和、更智能 ──
+private val ColorBackgroundDeep    = Color(0xFF020206)  // v7.0 更纯粹的黑
+private val ColorGlassPanel        = Color(0xCC0A0A12).copy(alpha = 0.82f)  // v7.0 微调
+private val ColorGlassBorderSubtle = Color.White.copy(alpha = 0.08f)  // v7.0 更微妙
+private val ColorLiveRed           = Color(0xFFFF5070)  // v7.0 更柔和的红
+private val ColorPositiveGreen     = Color(0xFF7DE8B8)  // v7.0 更舒适的绿
+private val ColorAuroraGlow        = Color(0xFF7DE8B8)  // v7.0 极光绿
 private val ColorWarningYellow     = Color(0xFFFFD68A)
-private val ColorLiquidHighlight   = Color.White.copy(alpha = 0.06f)
-private val ColorLiquidRefraction  = Color.White.copy(alpha = 0.015f)
-// Aurora palette from Dashboard.kt
-private val AuroraGreen   = Color(0xFF69F0AE)
-private val SunsetOrange  = Color(0xFFFFAB40)
-private val NebulaPink    = Color(0xFFFF80AB)
-private val CosmicViolet  = Color(0xFFB388FF)
+private val ColorLiquidHighlight   = Color.White.copy(alpha = 0.05f)  // v7.0 降低亮度
+private val ColorLiquidRefraction  = Color.White.copy(alpha = 0.012f)  // v7.0 更微妙
+// v7.0 新增色彩 — 晨/午/晚 色温
+private val MorningMist   = Color(0xFFB8D4E3)   // 晨雾蓝
+private val NoonGold      = Color(0xFFFFD68A)   // 正午金
+private val EveningRose   = Color(0xFFFFB09A)   // 暮光橙粉
+private val NightIndigo   = Color(0xFF9FA8DA)   // 夜空靛
+private val MistGray      = Color(0xFF1A1A24)   // v7.0 新增柔和灰
+// Aurora palette from Dashboard.kt (v7.0 微调)
+private val AuroraGreen   = Color(0xFF7DE8B8)   // 更舒适极光绿
+private val SunsetOrange  = Color(0xFFFFB07A)   // 更柔和日落橙
+private val NebulaPink    = Color(0xFFFF9AB8)   // 更轻柔星云粉
+private val CosmicViolet  = Color(0xFFB89AE8)   // 更梦幻宇宙紫
 
-// ── v6.0 Spring Configuration — Aurora organic physics ──
-private val SpringSnappy = spring<Float>(stiffness = 90f)  // v6.0 crisper response
+// ── v7.0 Spring Configuration — gentler, more organic physics ──
+private val SpringSnappy = spring<Float>(stiffness = 85f)  // v7.0 更柔和的响应
 private val SpringGentle = spring<Float>(stiffness = Spring.StiffnessLow)
-private val SpringBreath = spring<Float>(stiffness = Spring.StiffnessVeryLow)  // v6.0 organic breathing
+private val SpringBreath = spring<Float>(stiffness = Spring.StiffnessVeryLow)  // v7.0 有机呼吸
+private val SpringSoft = spring<Float>(dampingRatio = 0.75f, stiffness = 120f)  // v7.0 新增: 通用柔和弹簧
 
 // ── Color Constants for Emotions ──
 private val ColorSmile    = Color(0xFF4CAF50)
@@ -1821,16 +1823,48 @@ private fun EmotionBarsVerticalV4(
 
 // ─── v6.0 emotionColorV6: aurora-tinted color mapping ───
 /**
- * v6.0 Aurora Glow: Maps emotion names to aurora-tinted colors.
- * Each emotion gets a distinct aurora palette hue for visual variety.
+ * v7.0 Zen绽放: Maps emotion names to softer aurora-tinted colors.
+ * Each emotion gets a distinct but softer palette hue for gentle visual variety.
  */
-internal fun emotionColorV6(emotionName: String): Color = when (emotionName) {
-    "微笑"   -> AuroraGreen        // Happy / positive — bright green
-    "生气"   -> NebulaPink         // Angry / intense — warm pink
-    "中性"   -> CosmicViolet       // Neutral / calm — soft violet
+internal fun emotionColorV7(emotionName: String): Color = when (emotionName) {
+    "微笑"   -> AuroraGreen        // Happy / positive — soft green
+    "生气"   -> NebulaPink         // Angry / intense — softer pink
+    "中性"   -> CosmicViolet       // Neutral / calm — dreamy violet
     "思考"   -> CosmicViolet       // Thinking — deep violet
-    "惊讶"   -> SunsetOrange       // Surprise — energetic orange
+    "惊讶"   -> SunsetOrange       // Surprise — gentler orange
     "恐惧"   -> CosmicViolet       // Fear — muted violet
-    "厌恶"   -> SunsetOrange       // Disgust — murky orange
+    "厌恶"   -> SunsetOrange       // Disgust — softer orange
     else     -> AuroraGreen        // Default — aurora green
+}
+
+/** v7.0 兼容别名 */
+internal fun emotionColorV6(emotionName: String): Color = emotionColorV7(emotionName)
+
+// ─── v7.0 色温感知 — 根据时间段返回对应色温色彩 ───
+
+/**
+ * v7.0: 昼夜色温 — 根据当前时间返回对应的HUD色温色调
+ * 早晨(6-10)冷蓝 → 正午(11-14)暖金 → 午后(15-17)中性 → 傍晚(18-21)橙粉 → 夜间(22-5)靛蓝
+ */
+internal fun getCircadianColor(hour: Int = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)): Color {
+    return when {
+        hour in 6..10 -> MorningMist.copy(alpha = 0.5f)
+        hour in 11..14 -> NoonGold.copy(alpha = 0.4f)
+        hour in 15..17 -> MistGray.copy(alpha = 0.3f)
+        hour in 18..21 -> EveningRose.copy(alpha = 0.45f)
+        else -> NightIndigo.copy(alpha = 0.5f)
+    }
+}
+
+/**
+ * v7.0: 色温描述文案 — 返回当前时段的描述
+ */
+internal fun getCircadianLabel(hour: Int = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)): String {
+    return when {
+        hour in 6..10 -> "晨间清爽"
+        hour in 11..14 -> "正午温暖"
+        hour in 15..17 -> "午后柔和"
+        hour in 18..21 -> "暮色温柔"
+        else -> "夜幕宁静"
+    }
 }

@@ -377,7 +377,7 @@ data class MoodForecast(
     val predictedMood: String = "中性",
     val confidence: Float = 0.5f,
     val suggestion: String = "保持当前节奏",
-    val forecastColor: Long = 0xFF9FA8DA
+    val forecastColor: Int = 0xFF9FA8DA.toInt()
 )
 
 /**
@@ -421,15 +421,15 @@ fun calculateEmotionalResonance(snapshots: List<EmotionSnapshot>): Int {
 fun auroraMoodColor(
     smile: Float, angry: Float, neutral: Float,
     thinking: Float, surprise: Float, fear: Float, disgust: Float
-): Long {
+): Int {
     val colors = listOf(
-        0xFFFFD68A to smile,       // 微笑 → 金黄
-        0xFFFF6B6B to angry,       // 生气 → 红
-        0xFF9FA8DA to neutral,     // 中性 → 靛青
-        0xFFB388FF to thinking,    // 思考 → 宇宙紫
-        0xFFFFE082 to surprise,    // 惊讶 → 琥珀
-        0xFFFFAB40 to fear,        // 恐惧 → 日落橙
-        0xFFA1887F to disgust      // 厌恶 → 褐灰
+        0xFFFFD68A.toInt() to smile,
+        0xFFFF6B6B.toInt() to angry,
+        0xFF9FA8DA.toInt() to neutral,
+        0xFFB388FF.toInt() to thinking,
+        0xFFFFE082.toInt() to surprise,
+        0xFFFFAB40.toInt() to fear,
+        0xFFA1887F.toInt() to disgust
     )
     var r = 0.0; var g = 0.0; var b = 0.0; var totalW = 0.0
     colors.forEach { (col, w) ->
@@ -438,11 +438,11 @@ fun auroraMoodColor(
         val bb = (col and 0xFF).toDouble()
         r += rr * w; g += gg * w; b += bb * w; totalW += w
     }
-    if (totalW < 0.001) return 0xFF9FA8DA
+    if (totalW < 0.001) return 0xFF9FA8DA.toInt()
     val ri = (r / totalW).toInt().coerceIn(0, 255)
     val gi = (g / totalW).toInt().coerceIn(0, 255)
     val bi = (b / totalW).toInt().coerceIn(0, 255)
-    return (0xFF000000 or (ri shl 16) or (gi shl 8) or bi).toLong()
+    return (0xFF000000.toInt() or (ri shl 16) or (gi shl 8) or bi)
 }
 
 /**
@@ -475,9 +475,9 @@ fun generateMoodForecast(snapshots: List<EmotionSnapshot>): MoodForecast {
         else -> "情绪稳定，继续保持"
     }
     val color = when {
-        moodSlope > 0.15 -> 0xFF69F0AE  // AuroraGreen
-        moodSlope < -0.15 -> 0xFF9FA8DA  // Indigo
-        else -> 0xFFFFD68A  // WarmGold
+        moodSlope > 0.15 -> 0xFF69F0AE.toInt()  // AuroraGreen
+        moodSlope < -0.15 -> 0xFF9FA8DA.toInt()  // Indigo
+        else -> 0xFFFFD68A.toInt()  // WarmGold
     }
     return MoodForecast(
         predictedTrend = trend,
@@ -485,5 +485,220 @@ fun generateMoodForecast(snapshots: List<EmotionSnapshot>): MoodForecast {
         confidence = (0.4 + kotlin.math.abs(moodSlope) * 2).toFloat().coerceIn(0.2f, 0.9f),
         suggestion = suggestion,
         forecastColor = color
+    )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v7.0 "Zen绽放" — 情绪天气 · 智能日程 · 情绪周期 · 体验增强
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * v7.0: 情绪天气模型 — 用天气术语诗意化描述整体情绪状态
+ * 结合微笑占比、积极性、波动性、能量等级 → 拟天气表达
+ */
+data class EmotionWeather(
+    val condition: WeatherCondition,
+    val temperature: Int,       // "情绪温度" 0-100
+    val humidity: Int,          // "情绪湿度" (压力累积度)
+    val windSpeed: Int,         // "情绪风速" (变化速率)
+    val forecast: String,       // 天气式预测文案
+    val icon: String,           // 天气图标 emoji
+    val accentColor: Long       // 对应的点缀色
+)
+
+enum class WeatherCondition {
+    SUNNY,          // 阳光明媚 — 高微笑高积极
+    PARTLY_CLOUDY,  // 多云 — 中等微笑有波动
+    OVERCAST,       // 阴天 — 低微笑偏中性
+    LIGHT_RAIN,     // 小雨 — 负面情绪上升
+    THUNDERSTORM,   // 雷雨 — 情绪剧烈波动
+    STARRY_NIGHT,   // 星夜 — 平静安宁
+    DAWN_GLOW,      // 晨曦 — 低开高走
+    GOLDEN_HOUR     // 黄金时刻 — 巅峰状态
+}
+
+/**
+ * v7.0: 生成当前情绪天气
+ */
+fun generateEmotionWeather(snapshots: List<EmotionSnapshot>): EmotionWeather {
+    if (snapshots.size < 5) {
+        return EmotionWeather(
+            condition = WeatherCondition.PARTLY_CLOUDY,
+            temperature = 50, humidity = 40, windSpeed = 10,
+            forecast = "数据积累中，稍后将为你生成情绪天气 🌤",
+            icon = "🌤", accentColor = 0xFF9FA8DA
+        )
+    }
+    val recent = snapshots.takeLast(30)
+    val avgSmile = recent.map { it.smileProbability }.average().toFloat()
+    val avgPositive = recent.map { it.positivityIndex }.average()
+    val volatility = analyzeVolatility(recent)
+    val avgEnergy = recent.map { it.energyLevel }.average()
+    val avgValence = recent.map { it.valence }.average().toFloat()
+    val trendSlope = if (recent.size >= 6) {
+        recent.takeLast(6).map { it.smileProbability }.average() -
+            recent.take(6).map { it.smileProbability }.average()
+    } else 0.0
+
+    val temp = (avgSmile * 60 + avgPositive * 0.4).toInt().coerceIn(0, 100)
+    val humid = ((1.0 - avgSmile) * 50 + volatility * 50).toInt().coerceIn(0, 100)
+    val wind = (volatility * 80 + kotlin.math.abs(trendSlope) * 20).toInt().coerceIn(0, 100)
+
+    return when {
+        avgSmile > 0.7 && avgPositive > 65 && volatility < 0.2 ->
+            EmotionWeather(WeatherCondition.SUNNY, temp, humid, wind,
+                "今天阳光明媚，笑容灿烂！适合社交和重要决策 ☀️",
+                "☀️", 0xFFFFD68A)
+        avgSmile > 0.6 && avgEnergy > 60 ->
+            EmotionWeather(WeatherCondition.GOLDEN_HOUR, temp, humid, wind,
+                "处于黄金时刻，能量充沛！抓住这个状态做最重要的事 ✨",
+                "✨", 0xFFFFAB40)
+        trendSlope > 0.1 && volatility < 0.25 ->
+            EmotionWeather(WeatherCondition.DAWN_GLOW, temp, humid, wind,
+                "情绪如晨曦初升，越来越好！保持当前节奏 🌅",
+                "🌅", 0xFFFF80AB)
+        volatility < 0.15 && avgValence > 0f ->
+            EmotionWeather(WeatherCondition.STARRY_NIGHT, temp, humid, wind,
+                "内心如星夜般安宁平静，享受这份宁静 🌌",
+                "🌌", 0xFF9FA8DA)
+        avgSmile > 0.4 && avgSmile < 0.7 && volatility > 0.25 ->
+            EmotionWeather(WeatherCondition.PARTLY_CLOUDY, temp, humid, wind,
+                "情绪有晴有云，属正常波动。注意适时自我调节 ⛅",
+                "⛅", 0xFF8AC4F7)
+        avgSmile in 0.2f..0.4f && volatility < 0.2 ->
+            EmotionWeather(WeatherCondition.OVERCAST, temp, humid, wind,
+                "情绪有些沉闷，像是阴天。试着出门走走或听首喜欢的歌 ☁️",
+                "☁️", 0xFF78909C)
+        avgPositive < 35 || avgValence < -0.3 ->
+            EmotionWeather(WeatherCondition.LIGHT_RAIN, temp, humid, wind,
+                "情绪有小雨，给自己一些温柔。深呼吸，一切会好起来的 🌧",
+                "🌧", 0xFF7986CB)
+        volatility > 0.4 || (trendSlope < -0.15 && avgValence < -0.1) ->
+            EmotionWeather(WeatherCondition.THUNDERSTORM, temp, humid, wind,
+                "情绪波动较大，请允许自己暂停。喝杯温水，休息一下 ⛈",
+                "⛈", 0xFFB388FF)
+        else ->
+            EmotionWeather(WeatherCondition.PARTLY_CLOUDY, temp, humid, wind,
+                "情绪如多云天气，有起有伏是生活的常态 🌤",
+                "🌤", 0xFF8AC4F7)
+    }
+}
+
+/**
+ * v7.0: 智能日程建议 — 基于当前情绪状态给出时段性建议
+ */
+data class SmartScheduleAdvice(
+    val currentPhase: String,     // "晨间启动" / "午后低谷" / "傍晚恢复" / "夜间安宁"
+    val bestTaskType: String,     // 推荐做的事项类型
+    val breakReminder: String,    // 休息提示
+    val socialSuggestion: String, // 社交建议
+    val icon: String
+)
+
+fun generateSmartScheduleAdvice(
+    snapshots: List<EmotionSnapshot>,
+    currentHour: Int = 12
+): SmartScheduleAdvice {
+    val weather = generateEmotionWeather(snapshots)
+    return when {
+        currentHour in 6..9 -> SmartScheduleAdvice(
+            "晨间启动",
+            if (weather.temperature > 50) "处理重要决策和规划" else "轻松热身任务，逐渐进入状态",
+            "早餐后15分钟再开始工作",
+            if (weather.temperature > 50) "适合晨会和团队协作" else "先独处充电，晚些再社交",
+            "🌅"
+        )
+        currentHour in 10..12 -> SmartScheduleAdvice(
+            "上午黄金期",
+            if (weather.temperature > 60) "攻坚克难，做最有挑战的事" else "整理和复盘，稳步推进",
+            "每25分钟休息5分钟（番茄钟）",
+            "主动沟通推动事项进展",
+            "⚡"
+        )
+        currentHour in 13..15 -> SmartScheduleAdvice(
+            "午后低谷期",
+            "机械性任务、邮件处理、文件整理",
+            "午休10-20分钟，或起身散步5分钟",
+            "避免重要谈判，适合信息同步",
+            "☕"
+        )
+        currentHour in 16..18 -> SmartScheduleAdvice(
+            "傍晚恢复期",
+            if (weather.windSpeed < 30) "处理创意性工作" else "执行已确定的计划",
+            "活动肩颈，远眺窗外20秒",
+            "总结今日进展，规划明天重点",
+            "🌆"
+        )
+        else -> SmartScheduleAdvice(
+            "夜间安宁期",
+            "阅读、学习、轻度思考",
+            "准备放松，减少蓝光刺激",
+            "和家人朋友轻松聊天，享受当下",
+            "🌙"
+        )
+    }
+}
+
+/**
+ * v7.0: 情绪周期分析 — 识别情绪循环模式
+ */
+data class EmotionCycle(
+    val cycleLengthHours: Int,     // 周期长度（小时）
+    val currentPosition: String,   // 当前位置: "上升段"/"峰值"/"下降段"/"谷值"
+    val nextPeakTime: String,      // 下次高峰时间
+    val rhythmQuality: String,     // "规律"/"较规律"/"不规律"
+    val insight: String
+)
+
+fun analyzeEmotionCycle(snapshots: List<EmotionSnapshot>): EmotionCycle {
+    if (snapshots.size < 20) return EmotionCycle(
+        0, "采集中", "数据不足", "待评估",
+        "持续记录，积累足够数据后你的情绪节律会被揭示"
+    )
+    val smileValues = snapshots.map { it.smileProbability }
+    val avg = smileValues.average().toFloat()
+
+    // Simple peak/trough detection
+    var peaks = 0
+    var troughs = 0
+    for (i in 1 until smileValues.size - 1) {
+        if (smileValues[i] > smileValues[i - 1] && smileValues[i] > smileValues[i + 1] && smileValues[i] > avg) peaks++
+        if (smileValues[i] < smileValues[i - 1] && smileValues[i] < smileValues[i + 1] && smileValues[i] < avg) troughs++
+    }
+
+    val lastVal = smileValues.last()
+    val prevVal = smileValues.dropLast(1).lastOrNull() ?: lastVal
+    val direction = lastVal - prevVal
+
+    val position = when {
+        lastVal > avg * 1.1f && direction > 0 -> "峰值附近 😊"
+        lastVal > avg * 1.1f && direction <= 0 -> "从峰值回落"
+        lastVal < avg * 0.9f && direction < 0 -> "谷值附近 😔"
+        lastVal < avg * 0.9f && direction >= 0 -> "从谷值回升 📈"
+        direction > 0.02 -> "上升中 ↗"
+        direction < -0.02 -> "下降中 ↘"
+        else -> "平稳区间 ➡"
+    }
+
+    val regularity = when {
+        peaks + troughs >= 3 -> "规律"
+        peaks + troughs >= 1 -> "较规律"
+        else -> "不规律"
+    }
+
+    val insight = when {
+        lastVal > avg * 1.2f -> "你正在情绪高峰期，适合做创造性和有挑战的事!"
+        lastVal < avg * 0.8f -> "情绪低谷时不做重大决定，照顾好自己才是首位"
+        regularity == "不规律" -> "今天的情绪波动较大，尝试保持规律作息来稳定节奏"
+        direction > 0.05 -> "情绪正在上扬! 乘势推进手头的任务吧"
+        else -> "保持当前节奏，你的情绪状态很稳定"
+    }
+
+    return EmotionCycle(
+        cycleLengthHours = if (peaks + troughs > 0) (snapshots.size / (peaks + troughs).coerceAtLeast(1)) * 60 else 0,
+        currentPosition = position,
+        nextPeakTime = if (direction < 0) "约30-60分钟后" else "高峰期正在持续",
+        rhythmQuality = regularity,
+        insight = insight
     )
 }

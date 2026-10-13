@@ -54,21 +54,25 @@ import kotlinx.coroutines.delay
 import java.util.concurrent.TimeUnit
 
 // ═══════════════════════════════════════════════════════════════
-// v6.0 色彩系统 — Aurora Glow · 极光色系 · 4层景深
+// v7.0 色彩系统 — Zen绽放 · 色温感知 · 柔和极光 · 5层景深
 // ═══════════════════════════════════════════════════════════════
 
-private val DeepSpaceBg     = Color(0xFF030308)   // v6.0 极光色系背景
-private val WarmGold        = Color(0xFFFFD68A)   // v6.0 暖金色
-private val LavenderPurple  = Color(0xFFCCB0EB)   // v6.0 薰衣草
-private val AuroraGlow      = Color(0xFF69F0AE)   // v6.0 极光绿 — 新增主色
-private val GlassCard       = Color(0xFF0C0C14).copy(alpha = 0.90f)  // v6.0 更不透明
-private val GlassBorder     = Color(0xFFFFD68A).copy(alpha = 0.20f)  // v6.0 更明显边框
-private val TextPrimary     = Color(0xFFF5F5FF)   // v6.0 更纯净白
-private val TextSecondary   = Color(0xFFB0B0CC)   // v6.0 更清晰次要文字
-private val TextMuted       = Color(0xFF555570)   // v6.0
-private val AccentPink      = Color(0xFFFF97A8)   // v6.0
-private val AccentCyan      = Color(0xFF7AE8E8)   // v6.0
-private val LiquidHighlight = Color.White.copy(alpha = 0.06f)  // v6.0 液态高光
+private val DeepSpaceBg     = Color(0xFF020206)   // v7.0 更纯粹的黑
+private val WarmGold        = Color(0xFFFFD68A)   // v7.0 暖金色
+private val LavenderPurple  = Color(0xFFCCB0EB)   // v7.0 薰衣草
+private val AuroraGlow      = Color(0xFF7DE8B8)   // v7.0 更舒适极光绿
+private val GlassCard       = Color(0xFF0A0A12).copy(alpha = 0.88f)  // v7.0 微调
+private val GlassBorder     = Color(0xFFFFD68A).copy(alpha = 0.18f)  // v7.0 更微妙边框
+private val TextPrimary     = Color(0xFFF5F5FF)   // v7.0 纯净白
+private val TextSecondary   = Color(0xFFB0B0CC)   // v7.0 次要文字
+private val TextMuted       = Color(0xFF555570)   // v7.0
+private val AccentPink      = Color(0xFFFF9AB8)   // v7.0 更轻柔粉
+private val AccentCyan      = Color(0xFF7AE8E8)   // v7.0
+private val LiquidHighlight = Color.White.copy(alpha = 0.05f)  // v7.0 更柔和液态高光
+// v7.0 新增 — 昼夜感知色温
+private val MorningMist    = Color(0xFFB8D4E3)   // 晨雾蓝
+private val EveningRose    = Color(0xFFFFB09A)   // 暮光橙粉
+private val NightIndigo    = Color(0xFF9FA8DA)   // 夜空靛
 
 // ═══════════════════════════════════════════════════════════════
 // v4.0 应用状态机
@@ -302,24 +306,49 @@ private fun AppContent() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// v6.0 — 极光背景 (3色极光带: AuroraGreen / LavenderPurple / WarmGold)
+// v7.0 — 极光背景 (色温感知 · 5层景深 · 柔和漂移)
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * 极光缓慢流动渐变背景 — v6.0 Aurora Glow 版
- * 3色极光带: AuroraGreen / LavenderPurple / WarmGold — 4层景深
+ * v7.0: 极光缓慢流动渐变背景 — Zen绽放 版
+ * 5层景深 + 昼夜色温感知: 根据时间段自动调整极光色调
+ * 早晨偏冷蓝 → 正午偏暖金 → 傍晚偏橙粉 → 夜间偏靛蓝
  */
 @Composable
-private fun AuroraBackgroundV6(alpha: Float = 1f) {
-    val auroraProgress by rememberInfiniteTransition(label = "auroraV6").animateFloat(
+private fun AuroraBackgroundV7(alpha: Float = 1f) {
+    val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+    val auroraProgress by rememberInfiniteTransition(label = "auroraV7").animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(10000, easing = LinearEasing),
+            animation = tween(12000, easing = LinearEasing),  // v7.0 更慢的周期
             repeatMode = RepeatMode.Restart
         ),
-        label = "auroraProgressV6"
+        label = "auroraProgressV7"
     )
+
+    // v7.0: 时间段色温 — 选择主色调
+    val primaryGlow = when {
+        hour in 6..10 -> MorningMist
+        hour in 11..14 -> WarmGold
+        hour in 15..17 -> AuroraGlow
+        hour in 18..21 -> EveningRose
+        else -> NightIndigo
+    }
+    val secondaryGlow = when {
+        hour in 6..10 -> AuroraGlow
+        hour in 11..14 -> LavenderPurple
+        hour in 15..17 -> LavenderPurple
+        hour in 18..21 -> WarmGold
+        else -> LavenderPurple
+    }
+    val tertiaryGlow = when {
+        hour in 6..10 -> LavenderPurple
+        hour in 11..12 -> EveningRose
+        hour in 15..17 -> MorningMist
+        hour in 18..21 -> NightIndigo
+        else -> AuroraGlow
+    }
 
     Canvas(modifier = Modifier.fillMaxSize()) {
         val w = size.width
@@ -328,25 +357,26 @@ private fun AuroraBackgroundV6(alpha: Float = 1f) {
         // 基础深色背景
         drawRect(color = DeepSpaceBg)
 
-        // 极光层 1 — AuroraGreen (极光绿)
+        // v7.0 极光层 1 — 主色光带
         val offset1 = (w * 0.25f * kotlin.math.sin(auroraProgress.toDouble() * kotlin.math.PI * 2)).toFloat()
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    AuroraGlow.copy(alpha = 0.07f * alpha),
+                    primaryGlow.copy(alpha = 0.065f * alpha),
+                    primaryGlow.copy(alpha = 0.02f * alpha),
                     Color.Transparent
                 ),
-                center = Offset(x = (w * 0.5f + offset1).toFloat(), y = h * 0.25f),
-                radius = w * 0.5f
+                center = Offset(x = (w * 0.5f + offset1).toFloat(), y = h * 0.22f),
+                radius = w * 0.55f
             )
         )
 
-        // 极光层 2 — LavenderPurple (薰衣草紫)
+        // v7.0 极光层 2 — 副色光带
         val offset2 = (w * 0.2f * kotlin.math.cos(auroraProgress.toDouble() * kotlin.math.PI * 2.0 + 1.5)).toFloat()
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    LavenderPurple.copy(alpha = 0.05f * alpha),
+                    secondaryGlow.copy(alpha = 0.05f * alpha),
                     Color.Transparent
                 ),
                 center = Offset(x = (w * 0.4f + offset2), y = h * 0.65f),
@@ -354,40 +384,50 @@ private fun AuroraBackgroundV6(alpha: Float = 1f) {
             )
         )
 
-        // 极光层 3 — WarmGold (暖金色)
+        // v7.0 极光层 3 — 第三色光带
         val offset3 = (w * 0.15f * kotlin.math.sin(auroraProgress.toDouble() * kotlin.math.PI * 2.0 + 3.0)).toFloat()
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    WarmGold.copy(alpha = 0.05f * alpha),
+                    tertiaryGlow.copy(alpha = 0.045f * alpha),
                     Color.Transparent
                 ),
-                center = Offset(x = (w * 0.7f + offset3).toFloat(), y = h * 0.8f),
-                radius = w * 0.4f
+                center = Offset(x = (w * 0.7f + offset3).toFloat(), y = h * 0.80f),
+                radius = w * 0.40f
             )
         )
 
-        // 顶部微光 — AuroraGlow
+        // v7.0 新增极光层 4 — 顶部微光 (适配色温)
         drawRect(
             brush = Brush.verticalGradient(
                 colors = listOf(
-                    AuroraGlow.copy(alpha = 0.03f * alpha),
+                    primaryGlow.copy(alpha = 0.035f * alpha),
                     Color.Transparent
                 ),
                 startY = 0f,
                 endY = h * 0.35f
             )
         )
+
+        // v7.0 新增极光层 5 — 底部微光偏移带
+        val offset5 = (w * 0.1f * kotlin.math.sin(auroraProgress.toDouble() * kotlin.math.PI * 2.0 + 2.5)).toFloat()
+        drawRect(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    secondaryGlow.copy(alpha = 0.025f * alpha),
+                    Color.Transparent
+                ),
+                center = Offset(x = (w * 0.3f + offset5).toFloat(), y = h * 0.92f),
+                radius = w * 0.35f
+            )
+        )
     }
 }
 
-/**
- * v4.0 兼容别名 — 委托到 AuroraBackgroundV6
- */
-@Composable
-private fun AuroraBackgroundV4(alpha: Float = 1f) {
-    AuroraBackgroundV6(alpha)
-}
+/** v7.0 AuroraBackgroundV6 兼容别名 */
+@Composable private fun AuroraBackgroundV6(alpha: Float = 1f) = AuroraBackgroundV7(alpha)
+/** v4.0 兼容别名 */
+@Composable private fun AuroraBackgroundV4(alpha: Float = 1f) = AuroraBackgroundV7(alpha)
 
 // ═══════════════════════════════════════════════════════════════
 // v4.0 — SplashScreen: Canvas动态绘制微笑Logo + 流光效果

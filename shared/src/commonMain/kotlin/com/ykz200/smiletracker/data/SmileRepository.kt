@@ -47,7 +47,7 @@ class SmileRepositoryImpl(
                 raw_data = null
             )
         } catch (e: Exception) {
-            System.err.println("[SmileRepository] insertSync failed: ${e.message}")
+            println("[SmileRepository] insertSync failed: ${e.message}")
         }
     }
 
@@ -68,7 +68,7 @@ class SmileRepositoryImpl(
                     )
                 }
         } catch (e: Exception) {
-            System.err.println("[SmileRepository] queryMinuteStats failed: ${e.message}")
+            println("[SmileRepository] queryMinuteStats failed: ${e.message}")
             emptyList()
         }
     }
@@ -86,7 +86,7 @@ class SmileRepositoryImpl(
                 headRoll = row.head_roll.toFloat()
             )
         } catch (e: Exception) {
-            System.err.println("[SmileRepository] getLatest failed: ${e.message}")
+            println("[SmileRepository] getLatest failed: ${e.message}")
             null
         }
     }
@@ -99,7 +99,7 @@ class SmileRepositoryImpl(
             val cutoff = Clock.System.now().toEpochMilliseconds() - (retentionDays * 24L * 3600L * 1000L)
             database.smileDatabaseQueries.deleteOlderThan(cutoff)
         } catch (e: Exception) {
-            System.err.println("[SmileRepository] cleanup failed: ${e.message}")
+            println("[SmileRepository] cleanup failed: ${e.message}")
         }
     }
 

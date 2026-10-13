@@ -41,10 +41,11 @@ import kotlin.math.abs
 import kotlin.random.Random
 
 // ═══════════════════════════════════════════════════════════════
-// v6.0 Aurora Glow 视觉系统 — Liquid Glass 3.0 · 极光光感 · 智能共鸣
+// v7.0 Zen绽放 视觉系统 — MoodWeather · 情绪天气 · 智能日程 · 体验增强
 // ═══════════════════════════════════════════════════════════════
-// 设计哲学：从"静谧"进化到"流动的生命力" — 极光色系 + 有机动效 + 情感化共鸣
-// v6.0 新增：极光色系、彗星粒子、情感温度感应、有机曲线动效
+// 设计哲学：从"极光"进化到"天气生态" — 情绪天气模型 + 智能日程建议 + 情绪周期感知
+// v7.0 新增：情绪天气8种状态、智能时段日程、情绪周期分析、动态色温卡片
+// v7.0 升级：Liquid Glass 3.1 (微光衍射) + 动态背景色温 + 更舒适的视觉间距
 
 private val OledBackground = Color(0xFF000000)
 private val DeepSpace      = Color(0xFF030308)  // v6.0 更深邃
@@ -97,10 +98,10 @@ private const val GLOW_PULSE_MS = 350           // v6.0
 private const val CHART_ANIM_MS = 2200           // v6.0 更流畅的图表动画
 private const val BURNIN_PERIOD_X_MS = 100000    // v6.0 更长周期减少视觉疲劳
 private const val BURNIN_PERIOD_Y_MS = 85000
-private const val PARTICLE_COUNT = 24             // v6.0 更多粒子营造极光感
-private const val STATS_HORIZONTAL_PADDING = 18   // v6.0 更宽松
-private const val STATS_VERTICAL_PADDING = 22     // v6.0
-private const val CARD_RADIUS_DP = 26             // v6.0 更大圆角更圆润
+private const val PARTICLE_COUNT = 24             // v7.0保持
+private const val STATS_HORIZONTAL_PADDING = 16   // v7.0 更舒适的内边距
+private const val STATS_VERTICAL_PADDING = 24     // v7.0 更宽裕的卡片内边距
+private const val CARD_RADIUS_DP = 28             // v7.0 更圆润的卡片
 
 // v6.0 Liquid Glass 3.0 参数
 private const val REFRACTION_ANGLE_DEG = 18f      // v6.0 角度微调
@@ -271,15 +272,15 @@ fun Modifier.breathingGlassCardV4(
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Compose Multiplatform 共享 UI — Dashboard v6.0 "Aurora Glow"
+ * Compose Multiplatform 共享 UI — Dashboard v7.0 "Zen绽放"
  *
- * v6.0 升级亮点:
- *  - Liquid Glass 3.0 玻璃系统 (棱镜色散+双色边框+流光尾迹)
- *  - 极光色系 (6色情感色板: 极光绿/日落橙/星云粉/宇宙紫)
- *  - 极光粒子背景 (24粒子+6类型: 流星+星云漂移+三色极光带)
- *  - 有机曲线动效系统 (更柔和阻尼比+更慢呼吸)
-
- *  - 情感温度感应 + 心情预测卡片 (新增)
+ * v7.0 升级亮点:
+ *  - 情绪天气卡片 (拟天气诗意化表达: 晴天/星夜/晨曦/彩虹)
+ *  - 智能日程卡片 (时段感知+情绪自适应的任务建议)
+ *  - 情绪周期卡片 (峰值/谷值/周期长度/节律质量)
+ *  - Liquid Glass 3.1 (微光衍射+柔焦散射)
+ *  - 动态卡片色温 (基于情绪状态实时微调卡片色调)
+ *  - 心情预测卡片 (v6.0保留)
  */
 @Composable
 fun DashboardApp() {
@@ -300,8 +301,8 @@ fun DashboardApp() {
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Dashboard v6.0 主屏幕 — Aurora Glow · 极光玻璃拟态 + 情感共鸣
- * v6.0: 极光色系流动, 情感温度感应, 更沉浸的空间感
+ * Dashboard v7.0 主屏幕 — Zen绽放 · 情绪天气 + 智能日程 + 情感周期
+ * v7.0: 情绪天气生态, 智能时段建议, 周期感知, 更舒适的视觉体验
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -406,7 +407,9 @@ private fun DashboardScreen() {
                     item { AnimatedDashboardItemV6(delayMs = 200) { LongTermTrendCardV6() } }
                 } else {
                     item { AnimatedDashboardItemV6(delayMs = 0) { RealTimeFaceCardV6(face = latestFace) } }
-                    item { AnimatedDashboardItemV6(delayMs = 60) {
+                    // v7.0: 情绪天气卡片 — 核心新卡片，放在显著位置
+                    item { AnimatedDashboardItemV6(delayMs = 50) { EmotionWeatherCardV7(todayStats = todayStats) } }
+                    item { AnimatedDashboardItemV6(delayMs = 100) {
                         val smileSum = todayStats.sumOf { it.smileCount.toLong() }
                         val sampleSum = todayStats.sumOf { it.sampleCount.toLong() }
                         val avgSmileVal = if (todayStats.isNotEmpty())
@@ -420,17 +423,20 @@ private fun DashboardScreen() {
                         StatsGridV6(smileSum = smileSum, sampleSum = sampleSum,
                             avgSmile = avgSmileVal, eyeStrain = eyeStrain)
                     } }
-                    item { AnimatedDashboardItemV6(delayMs = 120) { AuroraDataStoryCardV6(todayStats = todayStats) } }
-                    item { AnimatedDashboardItemV6(delayMs = 180) { SmartSummaryCardV6(todayStats = todayStats, latestFace = latestFace) } }
-                    item { AnimatedDashboardItemV6(delayMs = 240) { BreathingGuideCardV6(emotionalTemp = emotionalTemperature) } }
-                    item { AnimatedDashboardItemV6(delayMs = 300) { MoodCarouselCardV6(todayStats = todayStats) } }
-                    item { AnimatedDashboardItemV6(delayMs = 360) { WorkRhythmCardV6(todayStats = todayStats) } }
-                    item { AnimatedDashboardItemV6(delayMs = 420) { InsightCardV6(todayStats = todayStats, latestFace = latestFace) } }
-                    item { AnimatedDashboardItemV6(delayMs = 480) { TrendChartSectionV6(todayStats = todayStats) } }
-                    item { AnimatedDashboardItemV6(delayMs = 540) { AmbientLightAdapterCardV6() } }
-                    item { AnimatedDashboardItemV6(delayMs = 600) { SmartSuggestionCardV6(todayStats = todayStats, latestFace = latestFace) } }
-                    // v6.0 新增: 心情预测卡片
-                    item { AnimatedDashboardItemV6(delayMs = 660) { MoodForecastCardV6(todayStats = todayStats) } }
+                    item { AnimatedDashboardItemV6(delayMs = 150) { AuroraDataStoryCardV6(todayStats = todayStats) } }
+                    item { AnimatedDashboardItemV6(delayMs = 200) { SmartSummaryCardV6(todayStats = todayStats, latestFace = latestFace) } }
+                    // v7.0: 智能日程卡片 — 时段感知建议
+                    item { AnimatedDashboardItemV6(delayMs = 250) { SmartScheduleCardV7(todayStats = todayStats) } }
+                    item { AnimatedDashboardItemV6(delayMs = 300) { BreathingGuideCardV6(emotionalTemp = emotionalTemperature) } }
+                    item { AnimatedDashboardItemV6(delayMs = 350) { MoodCarouselCardV6(todayStats = todayStats) } }
+                    item { AnimatedDashboardItemV6(delayMs = 400) { WorkRhythmCardV6(todayStats = todayStats) } }
+                    // v7.0: 情绪周期卡片 — 节律感知
+                    item { AnimatedDashboardItemV6(delayMs = 450) { EmotionCycleCardV7(todayStats = todayStats) } }
+                    item { AnimatedDashboardItemV6(delayMs = 500) { InsightCardV6(todayStats = todayStats, latestFace = latestFace) } }
+                    item { AnimatedDashboardItemV6(delayMs = 550) { TrendChartSectionV6(todayStats = todayStats) } }
+                    item { AnimatedDashboardItemV6(delayMs = 600) { AmbientLightAdapterCardV6() } }
+                    item { AnimatedDashboardItemV6(delayMs = 650) { SmartSuggestionCardV6(todayStats = todayStats, latestFace = latestFace) } }
+                    item { AnimatedDashboardItemV6(delayMs = 700) { MoodForecastCardV6(todayStats = todayStats) } }
                     if (todayStats.isNotEmpty()) {
                         item { AnimatedDashboardItemV6(delayMs = 700) {
                             Text(
@@ -616,11 +622,9 @@ private fun ParticleBackgroundV6() {
                 if (progress in 0.1f..0.9f) {
                     val trailX = currentX * size.width - 60.dp.toPx()
                     drawLine(
-                        brush = Brush.linearGradient(
-                            colors = listOf(Color.Transparent, p.color.copy(alpha = currentAlpha), Color.White.copy(alpha = currentAlpha * 0.8f)),
-                            start = Offset(trailX, currentY * size.height - 30.dp.toPx()),
-                            end = Offset(currentX * size.width, currentY * size.height)
-                        ),
+                        color = p.color.copy(alpha = currentAlpha),
+                        start = Offset(trailX, currentY * size.height - 30.dp.toPx()),
+                        end = Offset(currentX * size.width, currentY * size.height),
                         strokeWidth = p.size * 0.5f
                     )
                 }
@@ -720,6 +724,7 @@ private fun generateParticlesV6(): List<ParticleDataV6> {
 }
 
 /** v6.0 兼容别名 */
+@Composable
 private fun ParticleBackgroundV4() { ParticleBackgroundV6() }
 private fun generateParticlesV5() = generateParticlesV6()
 
@@ -2110,6 +2115,308 @@ private fun lerpV4(start: Color, stop: Color, fraction: Float): Color {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// v7.0 — 情绪天气卡片 · 智能日程卡片 · 情绪周期卡片
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * v7.0: 情绪天气卡片 — 用诗意化天气语言描述当前整体情绪状态
+ * 融合微笑占比/积极性/波动性/能量等级 → 拟天气表达 + 动态色温背景
+ */
+@Composable
+private fun EmotionWeatherCardV7(todayStats: List<MinuteStat>) {
+    // 构建快照序列用于情绪天气分析
+    val snapshots = remember(todayStats) {
+        todayStats.map { stat ->
+            EmotionSnapshot(
+                timestamp = System.currentTimeMillis(),
+                smileProbability = (stat.smilePercent / 100f).coerceIn(0f, 1f),
+                dominantEmotion = if (stat.smilePercent > 60) "微笑" else if (stat.smilePercent > 30) "中性" else "疲惫",
+                dominantProb = (stat.smilePercent / 100f).coerceIn(0f, 1f),
+                eyeStrainLevel = 1f - ((stat.avgEyeLeft.coerceAtLeast(0f) + stat.avgEyeRight.coerceAtLeast(0f)) / 2f),
+                headPosture = "正视",
+                valence = (stat.smilePercent / 100f) * 2f - 1f,
+                energyLevel = stat.smilePercent.toInt(),
+                angryProbability = if (stat.smilePercent < 20) 0.3f else 0f,
+                neutralProbability = if (stat.smilePercent in 20f..50f) 0.5f else 0.1f,
+                thinkingProbability = 0.1f,
+                surpriseProbability = if (stat.smilePercent > 70) 0.2f else 0f,
+                fearProbability = 0f,
+                disgustProbability = 0f,
+                positivityIndex = stat.smilePercent.toInt(),
+                emotionTag = if (stat.smilePercent > 50) "positive" else if (stat.smilePercent > 25) "neutral" else "negative"
+            )
+        }
+    }
+
+    val weather = remember(snapshots) { generateEmotionWeather(snapshots) }
+
+    GlassCardV4(glowColor = Color(weather.accentColor).copy(alpha = 0.3f)) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            // 标题区
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "天气情绪", style = MaterialTheme.typography.labelMedium,
+                    color = TextMuted, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 2.dp))
+                Spacer(modifier = Modifier.weight(1f))
+                Text(text = "实时", fontSize = 11.sp, color = Color(weather.accentColor),
+                    fontWeight = FontWeight.SemiBold)
+            }
+
+            // 核心天气展示
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = weather.icon, fontSize = 36.sp)
+                Spacer(modifier = Modifier.width(14.dp))
+                Column {
+                    Text(text = weather.forecast,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = TextPrimary, fontWeight = FontWeight.SemiBold,
+                        lineHeight = 22.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = when (weather.condition) {
+                            WeatherCondition.SUNNY -> " 阳光明媚 · 情绪温度 ${weather.temperature}°"
+                            WeatherCondition.PARTLY_CLOUDY -> " 多云天气 · 正常波动"
+                            WeatherCondition.OVERCAST -> " 阴天 · 情绪有些沉闷"
+                            WeatherCondition.LIGHT_RAIN -> " 小雨 · 需要自我关怀"
+                            WeatherCondition.THUNDERSTORM -> " 雷雨波动 · 请暂停休息"
+                            WeatherCondition.STARRY_NIGHT -> " 星夜 · 内心安宁"
+                            WeatherCondition.DAWN_GLOW -> " 晨曦 · 持续向好"
+                            WeatherCondition.GOLDEN_HOUR -> " 黄金时刻 · 状态巅峰"
+                        },
+                        fontSize = 12.sp, color = TextSecondary
+                    )
+                }
+            }
+
+            // 天气仪表 — 温度/湿度/风速
+            Row(
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                WeatherMiniGauge(label = "温暖", value = weather.temperature,
+                    icon = "🌡", color = AccentYellow, modifier = Modifier.weight(1f))
+                WeatherMiniGauge(label = "湿润", value = weather.humidity,
+                    icon = "💧", color = AccentCyan, modifier = Modifier.weight(1f))
+                WeatherMiniGauge(label = "风速", value = weather.windSpeed,
+                    icon = "🍃", color = AccentGreen, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+/**
+ * v7.0: 天气参数迷你仪表
+ */
+@Composable
+private fun WeatherMiniGauge(
+    label: String, value: Int, icon: String,
+    color: Color, modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxHeight()
+            .background(color.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
+            .border(0.5.dp, color.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(text = icon, fontSize = 14.sp)
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(text = "${value}°", fontSize = 14.sp,
+            fontWeight = FontWeight.Bold, color = color)
+        Text(text = label, fontSize = 10.sp, color = TextMuted)
+    }
+}
+
+/**
+ * v7.0: 智能日程卡片 — 感知当前时段情绪，给出个性化日程建议
+ */
+@Composable
+private fun SmartScheduleCardV7(todayStats: List<MinuteStat>) {
+    val snapshots = remember(todayStats) {
+        todayStats.map { stat ->
+            EmotionSnapshot(
+                timestamp = System.currentTimeMillis(),
+                smileProbability = (stat.smilePercent / 100f).coerceIn(0f, 1f),
+                dominantEmotion = if (stat.smilePercent > 60) "微笑" else if (stat.smilePercent > 30) "中性" else "疲惫",
+                dominantProb = (stat.smilePercent / 100f).coerceIn(0f, 1f),
+                eyeStrainLevel = 1f - ((stat.avgEyeLeft.coerceAtLeast(0f) + stat.avgEyeRight.coerceAtLeast(0f)) / 2f),
+                headPosture = "正视",
+                valence = (stat.smilePercent / 100f) * 2f - 1f,
+                energyLevel = stat.smilePercent.toInt(),
+                angryProbability = 0f, neutralProbability = 0f, thinkingProbability = 0f,
+                surpriseProbability = 0f, fearProbability = 0f, disgustProbability = 0f,
+                positivityIndex = stat.smilePercent.toInt(),
+                emotionTag = if (stat.smilePercent > 50) "positive" else "neutral"
+            )
+        }
+    }
+
+    val currentHour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+    val advice = remember(snapshots, currentHour) { generateSmartScheduleAdvice(snapshots, currentHour) }
+
+    GlassCardV4(glowColor = AccentBlue.copy(alpha = 0.2f)) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // 标题
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "智能日程", style = MaterialTheme.typography.labelMedium,
+                    color = TextMuted, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 2.dp))
+                Spacer(modifier = Modifier.weight(1f))
+                Text(text = "当前时段", fontSize = 11.sp, color = AccentCyan,
+                    fontWeight = FontWeight.SemiBold)
+            }
+
+            // 时段展示
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = advice.icon, fontSize = 32.sp)
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(text = advice.currentPhase,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary, fontWeight = FontWeight.Bold)
+                    Text(text = advice.bestTaskType,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary, lineHeight = 18.sp)
+                }
+            }
+
+            // 建议块
+            Column(
+                modifier = Modifier.fillMaxWidth()
+                    .background(AccentBlue.copy(alpha = 0.04f), RoundedCornerShape(12.dp))
+                    .border(0.5.dp, AccentBlue.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ScheduleAdviceRow(icon = "💡", text = advice.breakReminder, color = AccentYellow)
+                ScheduleAdviceRow(icon = "👥", text = advice.socialSuggestion, color = AccentGreen)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScheduleAdviceRow(icon: String, text: String, color: Color) {
+    Row(verticalAlignment = Alignment.Top) {
+        Text(text = icon, fontSize = 13.sp)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(text = text, style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary, lineHeight = 18.sp)
+    }
+}
+
+/**
+ * v7.0: 情绪周期卡片 — 识别用户情绪循环节律，预测峰值谷值
+ */
+@Composable
+private fun EmotionCycleCardV7(todayStats: List<MinuteStat>) {
+    val snapshots = remember(todayStats) {
+        todayStats.map { stat ->
+            EmotionSnapshot(
+                timestamp = System.currentTimeMillis(),
+                smileProbability = (stat.smilePercent / 100f).coerceIn(0f, 1f),
+                dominantEmotion = if (stat.smilePercent > 60) "微笑" else "中性",
+                dominantProb = (stat.smilePercent / 100f).coerceIn(0f, 1f),
+                eyeStrainLevel = 1f - ((stat.avgEyeLeft.coerceAtLeast(0f) + stat.avgEyeRight.coerceAtLeast(0f)) / 2f),
+                headPosture = "正视",
+                valence = (stat.smilePercent / 100f) * 2f - 1f,
+                energyLevel = stat.smilePercent.toInt(),
+                angryProbability = 0f, neutralProbability = 0f, thinkingProbability = 0f,
+                surpriseProbability = 0f, fearProbability = 0f, disgustProbability = 0f,
+                positivityIndex = stat.smilePercent.toInt(),
+                emotionTag = if (stat.smilePercent > 50) "positive" else "neutral"
+            )
+        }
+    }
+
+    val cycle = remember(snapshots) { analyzeEmotionCycle(snapshots) }
+
+    GlassCardV4(glowColor = AccentPurple.copy(alpha = 0.2f)) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // 标题
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "情绪节律", style = MaterialTheme.typography.labelMedium,
+                    color = TextMuted, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 2.dp))
+                Spacer(modifier = Modifier.weight(1f))
+                Text(text = "周期分析", fontSize = 11.sp, color = AccentPurple,
+                    fontWeight = FontWeight.SemiBold)
+            }
+
+            // 当前位置可视化
+            Column {
+                Text(text = "当前位置", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                Spacer(modifier = Modifier.height(6.dp))
+                // 周期位置指示器
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(36.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    // 背景轨道
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(Color.White.copy(alpha = 0.05f))
+                    )
+                    // 当前位置标记
+                    val snapshotsAvg = if (snapshots.isNotEmpty())
+                        snapshots.map { it.smileProbability }.average().toFloat() else 0.5f
+                    val indicatorPos = snapshotsAvg.coerceIn(0.05f, 0.95f)
+                    Box(
+                        modifier = Modifier
+                            .offset(x = (indicatorPos * 200).dp)
+                            .size(14.dp)
+                            .background(AccentPurple.copy(alpha = 0.15f), CircleShape)
+                            .border(2.dp, AccentPurple, CircleShape)
+                    )
+                }
+                Text(text = cycle.currentPosition,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AccentPurple, fontWeight = FontWeight.SemiBold)
+            }
+
+            // 统计信息
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CycleStatChip(label = "节律", value = cycle.rhythmQuality, color = AccentIndigo)
+                CycleStatChip(label = "下次峰值", value = cycle.nextPeakTime, color = AccentAmber)
+            }
+
+            // 洞察
+            Text(
+                text = cycle.insight,
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+                lineHeight = 18.dp.value.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(AccentPurple.copy(alpha = 0.04f), RoundedCornerShape(10.dp))
+                    .padding(10.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun CycleStatChip(label: String, value: String, color: Color) {
+    Column(
+        modifier = Modifier
+            .background(color.copy(alpha = 0.06f), RoundedCornerShape(10.dp))
+            .border(0.5.dp, color.copy(alpha = 0.12f), RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(text = value, fontSize = 12.sp, color = color,
+            fontWeight = FontWeight.Bold)
+        Text(text = label, fontSize = 10.sp, color = TextMuted)
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // v6.0 极光色系兼容别名 — 所有 V4/V5 组件的 V6 入口
 // ═══════════════════════════════════════════════════════════════
 
@@ -2148,6 +2455,10 @@ private fun MoodForecastCardV6(todayStats: List<MinuteStat>) {
             EmotionSnapshot(
                 timestamp = idx.toLong() * 60_000L,
                 smileProbability = (stat.smilePercent / 100f).coerceIn(0f, 1f),
+                dominantEmotion = if (stat.smilePercent > 50) "微笑" else "中性",
+                dominantProb = stat.smilePercent / 100f,
+                eyeStrainLevel = 0.2f,
+                headPosture = "正视",
                 angryProbability = 0.05f,
                 neutralProbability = 0.3f,
                 thinkingProbability = 0.1f,
@@ -2180,7 +2491,7 @@ private fun MoodForecastCardV6(todayStats: List<MinuteStat>) {
                         text = when {
                             forecast.predictedTrend.contains("上升") -> "↗"
                             forecast.predictedTrend.contains("下降") -> "↘"
-                            else → "→"
+                            else -> "→"
                         },
                         fontSize = 18.sp,
                         color = Color.White,
