@@ -702,3 +702,259 @@ fun analyzeEmotionCycle(snapshots: List<EmotionSnapshot>): EmotionCycle {
         insight = insight
     )
 }
+
+// ═══════════════════════════════════════════════════════════════
+// v8.0 "Astral Glow" 星光璀璨 — 深度智能体验升级
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * v8.0: 每日心情弧线 — 将一天的心情变化概括为故事线
+ */
+data class DailyMoodArc(
+    val arcType: ArcType,
+    val title: String,
+    val description: String,
+    val startTime: String,
+    val endTime: String,
+    val highlight: String,
+    val arcColor: Long,
+    val icon: String
+)
+
+enum class ArcType {
+    STEADY_RISE,    // 稳步上升
+    MORNING_PEAK,   // 早峰型
+    AFTERNOON_DROP, // 午后低谷型
+    EVENING_REBOUND,// 傍晚反弹型
+    ROLLER_COASTER, // 过山车型
+    FLAT_CALM       // 平静型
+}
+
+/**
+ * v8.0: 生成每日心情弧线
+ */
+fun generateDailyMoodArc(snapshots: List<EmotionSnapshot>): DailyMoodArc {
+    if (snapshots.size < 5) {
+        return DailyMoodArc(
+            ArcType.FLAT_CALM, "数据积累中", "让摄像头运行一段时间，你的心情弧线将逐渐清晰可见",
+            "--:--", "--:--", "",
+            0xFF9FA8DA, "🌙"
+        )
+    }
+    val morning = snapshots.filter {
+        val h = ((it.timestamp / 3600000) % 24).toInt()
+        h in 6..11
+    }
+    val afternoon = snapshots.filter {
+        val h = ((it.timestamp / 3600000) % 24).toInt()
+        h in 12..17
+    }
+    val evening = snapshots.filter {
+        val h = ((it.timestamp / 3600000) % 24).toInt()
+        h >= 18
+    }
+
+    val avgMorning = morning.map { it.smileProbability }.average().let { if (it.isNaN()) 0.5 else it }.toFloat()
+    val avgAfternoon = afternoon.map { it.smileProbability }.average().let { if (it.isNaN()) 0.4 else it }.toFloat()
+    val avgEvening = evening.map { it.smileProbability }.average().let { if (it.isNaN()) 0.45 else it }.toFloat()
+
+    val arcType = when {
+        avgMorning < avgAfternoon && avgAfternoon < avgEvening -> ArcType.STEADY_RISE
+        avgMorning > avgAfternoon * 1.3 && avgMorning > avgEvening * 1.1 -> ArcType.MORNING_PEAK
+        avgAfternoon < avgMorning * 0.7 && avgAfternoon < avgEvening * 0.8 -> ArcType.AFTERNOON_DROP
+        avgEvening > avgAfternoon * 1.3 -> ArcType.EVENING_REBOUND
+        snapshots.map { it.smileProbability }.let { kotlin.math.sqrt(it.map { v -> (v - it.average()) * (v - it.average()) }.average()) } > 0.25 -> ArcType.ROLLER_COASTER
+        else -> ArcType.FLAT_CALM
+    }
+
+    return when (arcType) {
+        ArcType.STEADY_RISE -> DailyMoodArc(arcType, "稳步上升型 📈",
+            "你的心情像清晨的阳光，一天比一天更温暖。这种渐进式提升说明你正在进入良好状态。",
+            "09:00", "18:00", "傍晚达到状态巅峰", 0xFF69F0AE, "🌅")
+        ArcType.MORNING_PEAK -> DailyMoodArc(arcType, "早鸟高峰型 🐦",
+            "早晨的你充满能量！这段时间适合处理最重要的任务，把困难安排在上午攻克。",
+            "09:00", "12:00", "上午是最强时间段", 0xFFFFD68A, "☀️")
+        ArcType.AFTERNOON_DROP -> DailyMoodArc(arcType, "午后小憩型 ☕",
+            "午后低谷是正常的生理节律。安排10分钟散步或一杯咖啡，能显著提升下午后半段的状态。",
+            "13:00", "15:00", "低谷后傍晚回升", 0xFF8AC4F7, "☕")
+        ArcType.EVENING_REBOUND -> DailyMoodArc(arcType, "傍晚反弹型 🌟",
+            "下午有所回落但傍晚大幅回升，你是夜晚型能量人。适合晚间从事创意类工作。",
+            "18:00", "21:00", "傍晚能量回归", 0xFFB388FF, "✨")
+        ArcType.ROLLER_COASTER -> DailyMoodArc(arcType, "过山车型 🎢",
+            "今天情绪波动较大，可能受到了外部事件的影响。建议晚间花5分钟记录今天发生的事。",
+            "09:00", "18:00", "起伏中寻找规律", 0xFFFFAB40, "🎢")
+        ArcType.FLAT_CALM -> DailyMoodArc(arcType, "宁静水平型 🌊",
+            "今天是平静稳定的一天，情绪如平湖般安宁。这种状态适合深度思考和创意工作。",
+            "09:00", "18:00", "持久平稳", 0xFF7AE8E8, "🌊")
+    }
+}
+
+/**
+ * v8.0: 个人化智能建议 — 基于多维数据的个性化文字
+ */
+data class PersonalizedTip(
+    val tipType: TipType,
+    val title: String,
+    val content: String,
+    val action: String,
+    val icon: String,
+    val accentName: String
+)
+
+enum class TipType {
+    SELF_CARE,      // 自我关怀
+    PRODUCTIVITY,   // 生产力
+    SOCIAL,         // 社交
+    REST,           // 休息
+    MINDFULNESS     // 正念
+}
+
+/**
+ * v8.0: 生成个性化建议
+ */
+fun generatePersonalizedTips(
+    snapshots: List<EmotionSnapshot>,
+    weather: EmotionWeather,
+    cycle: EmotionCycle
+): List<PersonalizedTip> {
+    val tips = mutableListOf<PersonalizedTip>()
+
+    // 基于情绪天气的建议
+    when (weather.condition) {
+        WeatherCondition.THUNDERSTORM -> tips.add(PersonalizedTip(
+            TipType.SELF_CARE, "让心灵避雨 🌧",
+            "检测到情绪波动较大。不要评判自己的感受，允许自己暂时不那么坚强。",
+            "深呼吸3次，告诉自己「此刻的感受是正常的」", "🌧", "雨紫"
+        ))
+        WeatherCondition.LIGHT_RAIN -> tips.add(PersonalizedTip(
+            TipType.MINDFULNESS, "雨后总会天晴 🌦",
+            "情绪有小雨，这说明你在认真感受生活。给自己一些温柔的关照。",
+            "泡一杯热饮，听一首喜欢的歌", "🌦", "雾蓝"
+        ))
+        WeatherCondition.OVERCAST -> tips.add(PersonalizedTip(
+            TipType.PRODUCTIVITY, "阴天也有价值 ☁️",
+            "低沉时适合做不需要太多创造力的机械性任务。接纳当前状态，量力而行。",
+            "整理文件、回复邮件、做简单规划", "☁️", "云灰"
+        ))
+        WeatherCondition.STARRY_NIGHT -> tips.add(PersonalizedTip(
+            TipType.MINDFULNESS, "享受内心的宁静 🌌",
+            "你正处于平静祥和的时期。这是深度思考和记忆整理的好时机。",
+            "写下3件今天感恩的小事", "🌌", "星紫"
+        ))
+        WeatherCondition.GOLDEN_HOUR -> tips.add(PersonalizedTip(
+            TipType.PRODUCTIVITY, "抓住你的黄金时刻 ✨",
+            "状态巅峰期！能量充沛、心情愉悦，是做最重要的事的最佳时机。",
+            "现在就开始那个你一直拖延的重要任务", "✨", "金橙"
+        ))
+        else -> {}
+    }
+
+    // 基于情绪周期的建议
+    if (cycle.currentPosition.contains("谷值")) {
+        tips.add(PersonalizedTip(
+            TipType.REST, "低谷不等于失败 💚",
+            "你正处于周期的低谷段，这是身体在提醒你需要休息。",
+            "起身活动5分钟，做一次颈肩拉伸", "💚", "草绿"
+        ))
+    }
+
+    // 通用正念建议
+    tips.add(PersonalizedTip(
+        TipType.MINDFULNESS, "此刻的你，刚刚好 💫",
+        "无论今天过得如何，你愿意观察自己，这本身就是一种勇气和温柔。",
+        "关注下一次呼吸，感受空气进入身体", "💫", "柔光"
+    ))
+
+    return tips.take(3)
+}
+
+/**
+ * v8.0: 自我对话 — 帮助建立积极的自我认知
+ */
+data class VoiceOfSelf(
+    val reflection: String,
+    val encouragement: String,
+    val dailyAffirmation: String,
+    val icon: String
+)
+
+/**
+ * v8.0: 生成今日自我对话
+ */
+fun generateVoiceOfSelf(snapshots: List<EmotionSnapshot>): VoiceOfSelf {
+    if (snapshots.size < 10) return VoiceOfSelf(
+        "开始记录的第一天，就是改变的开始 ✨",
+        "每一次对自我的关注，都是送给自己的礼物。",
+        "我值得拥有平静与快乐 🌸", "🌱"
+    )
+    val avgSmile = snapshots.map { it.smileProbability }.average().toFloat()
+    val positiveRatio = snapshots.count { it.smileProbability > 0.5f } / snapshots.size.toFloat()
+
+    return when {
+        positiveRatio > 0.6f -> VoiceOfSelf(
+            "今天你笑了${(positiveRatio * 100).toInt()}% 的时间。你比自己以为的更容易感到快乐 😊",
+            "这份积极可以感染身边保持微笑的人。分享你的快乐吧！",
+            "我正变得越来越从容 🌸", "🌷"
+        )
+        positiveRatio > 0.3f -> VoiceOfSelf(
+            "今天有${(positiveRatio * 100).toInt()}% 的时间你带着微笑。不容易，但你做到了 💪",
+            "平淡的一天也值得庆祝。稳定本身就是一种了不起的能量。",
+            "我接纳此刻的自己，一切都在变好 🌿", "🍀"
+        )
+        else -> VoiceOfSelf(
+            "今天对生活的要求有些苛刻。微笑不是义务，但记得给自已一点温柔 🌙",
+            "低落的日子不会永远持续。你要做的只是等待，对自己耐心一点。",
+            "我允许自己有情绪低谷，这并不意味着失败 🕯️", "🕯"
+        )
+    }
+}
+
+/**
+ * v8.0: 里程碑模型 — 庆祝小胜利
+ */
+data class MilestoneCard(
+    val title: String,
+    val description: String,
+    val icon: String,
+    val isNew: Boolean,
+    val accentHex: Long
+)
+
+/**
+ * v8.0: 生成里程碑卡片
+ */
+fun generateMilestone(totalDays: Int, totalSmiles: Int, currentStreak: Int): MilestoneCard? {
+    return when {
+        totalDays == 1 -> MilestoneCard(
+            "初见 · 记录第一天 ✨",
+            "千里之行始于足下。从今天起，SmileTracker 将陪伴你记录每一个微笑。",
+            "✨", true, 0xFFFFD68A
+        )
+        totalDays == 7 -> MilestoneCard(
+            "一周 · 初识自我 💫",
+            "连续记录一周！你已经比90%的人更了解自己的情绪模式了。",
+            "💫", true, 0xFF8AC4F7
+        )
+        totalDays == 30 -> MilestoneCard(
+            "一月 · 情绪掌舵者 🌙",
+            "坚持30天！你的情绪地图已经初具规模，继续前行吧。",
+            "🌙", true, 0xFFB388FF
+        )
+        currentStreak == 7 -> MilestoneCard(
+            "连击 · 七日不休 🔥",
+            "连续7天记录！习惯正在养成，你比想象中更坚持。",
+            "🔥", true, 0xFFFFAB40
+        )
+        totalSmiles >= 100 -> MilestoneCard(
+            "百日微笑 · 值得庆祝 🎉",
+            "累计微笑达到100次！每一次上扬的嘴角都值得被记住。",
+            "🎉", true, 0xFF69F0AE
+        )
+        totalSmiles >= 1000 -> MilestoneCard(
+            "千笑收藏 · 情绪艺术家 🎨",
+            "超过1000条微笑记录！你的情绪历程本身就是一件艺术品。",
+            "🎨", true, 0xFF7AE8E8
+        )
+        else -> null
+    }
+}

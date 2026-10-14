@@ -41,74 +41,78 @@ import kotlin.math.abs
 import kotlin.random.Random
 
 // ═══════════════════════════════════════════════════════════════
-// v7.0 Zen绽放 视觉系统 — MoodWeather · 情绪天气 · 智能日程 · 体验增强
+// v8.0 Astral Glow 视觉系统 — 星光璀璨 · 心情弧线 · 自我对话 · 里程碑
 // ═══════════════════════════════════════════════════════════════
-// 设计哲学：从"极光"进化到"天气生态" — 情绪天气模型 + 智能日程建议 + 情绪周期感知
-// v7.0 新增：情绪天气8种状态、智能时段日程、情绪周期分析、动态色温卡片
-// v7.0 升级：Liquid Glass 3.1 (微光衍射) + 动态背景色温 + 更舒适的视觉间距
+// 设计哲学：从"天气生态"进化到"星空叙事" — 用星光讲述你的情绪故事
+// v8.0 新增：每日心情弧线(6种类型)、个人化智能建议、自我对话系统、里程碑庆祝
+// v8.0 升级：Liquid Glass 4.0 (星尘微光) + 星轨粒子背景 + 更舒适的卡片圆角与间距
+// v8.0 升级：色温系统优化为12色调色板、更柔和的光晕扩散、提升视觉舒适度
 
+// v8.0 Astral Glow 色系 — 12色调色板，更柔和、更舒适
 private val OledBackground = Color(0xFF000000)
-private val DeepSpace      = Color(0xFF030308)  // v6.0 更深邃
-private val SurfaceCard    = Color(0xFF0A0A12)  // v6.0 微调
-private val SurfaceCardHi  = Color(0xFF0F0F18)
-private val SurfaceGlass   = Color(0xFF14141E).copy(alpha = 0.92f)
-private val SurfaceLiquid  = Color(0xFF1A1A26).copy(alpha = 0.85f) // v6.0 Liquid Glass 3.0
-private val DividerColor   = Color(0xFF14141E)  // v6.0
+private val DeepSpace      = Color(0xFF020208)  // v8.0 更深邃的宇宙色
+private val SurfaceCard    = Color(0xFF08080F)  // v8.0 微调更舒适的底色
+private val SurfaceCardHi  = Color(0xFF0C0C16)
+private val SurfaceGlass   = Color(0xFF10101C).copy(alpha = 0.92f)
+private val SurfaceLiquid  = Color(0xFF161622).copy(alpha = 0.88f) // v8.0 Liquid Glass 4.0
+private val DividerColor   = Color(0xFF10101A)  // v8.0
 
-// v6.0 极光色系 — 从自然极光中萃取的 14 色情感色板
-private val AccentYellow = Color(0xFFFFD68A)
-private val AccentBlue   = Color(0xFF8AC4F7)
-private val AccentGreen  = Color(0xFF9ADBA8)
-private val AccentPink   = Color(0xFFF4AAC8)
-private val AccentPurple = Color(0xFFCCB0EB)
-private val AccentOrange = Color(0xFFFFC88A)
-private val AccentCyan   = Color(0xFF7AE8E8)
-private val AccentCoral  = Color(0xFFFFA894)
-private val AccentRose   = Color(0xFFFF97A8)
-private val AccentMint   = Color(0xFF85F2C5)
-private val AccentAmber  = Color(0xFFFFE082)
-private val AccentIndigo = Color(0xFF9FA8DA)
-// v6.0 新增极光专属色
-private val AuroraGreen   = Color(0xFF69F0AE)   // 极光绿 — 活力
-private val SunsetOrange = Color(0xFFFFAB40)   // 日落橙 — 温暖
-private val NebulaPink   = Color(0xFFFF80AB)   // 星云粉 — 温柔
-private val CosmicViolet = Color(0xFFB388FF)   // 宇宙紫 — 深邃
+// v8.0 12色舒适情感色板 — 降低饱和度、提升视觉舒适度
+private val AccentYellow = Color(0xFFFFE08A)   // v8.0 更柔和的暖金色
+private val AccentBlue   = Color(0xFF9AC4F7)   // v8.0 更舒适的天蓝色
+private val AccentGreen  = Color(0xFFA8E6B8)   // v8.0 更嫩绿的积极色
+private val AccentPink   = Color(0xFFF0B8C8)   // v8.0 更温柔的粉色
+private val AccentPurple = Color(0xFFD0BCE8)   // v8.0 更梦幻的紫
+private val AccentOrange = Color(0xFFFFC89A)   // v8.0 更柔和的珊瑚橙
+private val AccentCyan   = Color(0xFF8AE8E8)   // v8.0 略微降低饱和度的青
+private val AccentCoral  = Color(0xFFFFB0A0)   // v8.0 更温柔的红珊瑚
+private val AccentRose   = Color(0xFFFFA0B8)   // v8.0 柔粉
+private val AccentMint   = Color(0xFF95E8D0)   // v8.0 薄荷绿
+private val AccentAmber  = Color(0xFFFFE8A0)   // v8.0 更温柔的琥珀色
+private val AccentIndigo = Color(0xFFA8B0DA)   // v8.0 降低饱和度的靛蓝
+// v8.0 新增专属色
+private val AuroraGreen   = Color(0xFF7DE8C0)   // v8.0 更柔和的极光绿
+private val SunsetOrange  = Color(0xFFFFB88A)   // v8.0 更温暖
+private val NebulaPink    = Color(0xFFF0B0D0)   // v8.0 更温柔
+private val CosmicViolet  = Color(0xFFC0A8F0)   // v8.0 更梦幻的宇宙紫
+private val StarbeamGold  = Color(0xFFFFF0C0)   // v8.0 新增：星光金
+private val NebulaMist    = Color(0xFFB8D0F0)   // v8.0 新增：星云雾霭
 
-// v6.0 Liquid Glass 3.0 层级 — 更精细的多层折射
-private val GlassHighlight  = Color.White.copy(alpha = 0.06f)   // v6.0 微增
-private val GlassBorder     = Color.White.copy(alpha = 0.08f)   // v6.0 微增
-private val GlassGlow       = Color.White.copy(alpha = 0.03f)   // v6.0 微增
-private val GlassShadow     = Color.Black.copy(alpha = 0.40f)   // v6.0 更深
-private val GlassRefraction = Color.White.copy(alpha = 0.015f)  // v6.0 折射微光增强
+// v8.0 Liquid Glass 4.0 层级 — 微光穿透+柔焦散射
+private val GlassHighlight  = Color.White.copy(alpha = 0.055f)  // v8.0 微降
+private val GlassBorder     = Color.White.copy(alpha = 0.07f)   // v8.0 更克制的边框
+private val GlassGlow       = Color.White.copy(alpha = 0.025f)  // v8.0 更柔和的微光
+private val GlassShadow     = Color.Black.copy(alpha = 0.35f)   // v8.0 减少压迫感
+private val GlassRefraction = Color.White.copy(alpha = 0.012f)  // v8.0 更微妙
 
-// v6.0 文字层级 — 更佳的对比度和可读性
-private val TextPrimary   = Color(0xFFF5F5FF)  // v6.0 更亮白
-private val TextSecondary = Color(0xFFB0B0CC)  // v6.0 微亮
-private val TextMuted     = Color(0xFF5C5C78)
-private val TextDisabled  = Color(0xFF2A2A3A)
-private val TextGlow      = Color(0xFFFFEEDD)  // v6.0 更暖的辉光
+// v8.0 文字层级 — 更高的对比度和更舒适的阅读体验
+private val TextPrimary   = Color(0xFFF8F8FF)  // v8.0 更纯净的白
+private val TextSecondary = Color(0xFFB8B8D0)  // v8.0 微亮提升可读性
+private val TextMuted     = Color(0xFF606080)  // v8.0 柔和灰
+private val TextDisabled  = Color(0xFF2E2E40)
+private val TextGlow      = Color(0xFFFFF5E8)  // v8.0 更温暖的辉光色
 
-// v6.0 动画常量 — 有机曲线动效系统
-private const val BREATHING_CYCLE_MS = 5000     // v6.0 更缓慢的呼吸
-private const val ENTRANCE_STIFFNESS = 140f     // v6.0 更柔和的入场 (降低刚度)
-private val ENTRANCE_SPRING = spring<Float>(dampingRatio = 0.80f, stiffness = ENTRANCE_STIFFNESS)
-private val MICRO_SPRING = spring<Float>(dampingRatio = 0.58f, stiffness = 240f)  // v6.0 Q弹微交互
-private val COLOR_SPRINE = spring<Color>(dampingRatio = 0.85f, stiffness = 100f)   // v6.0 更柔的色彩过渡
-private const val GLOW_PULSE_MS = 350           // v6.0
-private const val CHART_ANIM_MS = 2200           // v6.0 更流畅的图表动画
-private const val BURNIN_PERIOD_X_MS = 100000    // v6.0 更长周期减少视觉疲劳
-private const val BURNIN_PERIOD_Y_MS = 85000
-private const val PARTICLE_COUNT = 24             // v7.0保持
-private const val STATS_HORIZONTAL_PADDING = 16   // v7.0 更舒适的内边距
-private const val STATS_VERTICAL_PADDING = 24     // v7.0 更宽裕的卡片内边距
-private const val CARD_RADIUS_DP = 28             // v7.0 更圆润的卡片
+// v8.0 动画常数 — 有机呼吸动效系统，更缓慢更舒适
+private const val BREATHING_CYCLE_MS = 5500     // v8.0 更缓慢的呼吸
+private const val ENTRANCE_STIFFNESS = 130f     // v8.0 更柔和的入场
+private val ENTRANCE_SPRING = spring<Float>(dampingRatio = 0.82f, stiffness = ENTRANCE_STIFFNESS)
+private val MICRO_SPRING = spring<Float>(dampingRatio = 0.60f, stiffness = 220f)  // v8.0 更柔和微交互
+private val COLOR_SPRINE = spring<Color>(dampingRatio = 0.88f, stiffness = 90f)   // v8.0 更柔的色彩过渡
+private const val GLOW_PULSE_MS = 380           // v8.0
+private const val CHART_ANIM_MS = 2400           // v8.0 更流畅的图表动画
+private const val BURNIN_PERIOD_X_MS = 120000    // v8.0 更长周期减少视觉疲劳
+private const val BURNIN_PERIOD_Y_MS = 100000
+private const val PARTICLE_COUNT = 32             // v8.0 更多的星尘粒子
+private const val STATS_HORIZONTAL_PADDING = 18   // v8.0 更舒适的内边距
+private const val STATS_VERTICAL_PADDING = 26     // v8.0 更宽裕的卡片内边距
+private const val CARD_RADIUS_DP = 32             // v8.0 更大圆角更舒适
 
-// v6.0 Liquid Glass 3.0 参数
-private const val REFRACTION_ANGLE_DEG = 18f      // v6.0 角度微调
-private const val LIQUID_FLOW_CYCLE_MS = 9000     // v6.0 更慢的流光
-private const val DEPTH_LAYERS = 4                 // v6.0 增加一层景深
-private const val AURORA_DRIFT_CYCLE_MS = 12000    // v6.0 极光漂移周期
-private const val SHOOTING_STAR_CHANCE = 0.003f   // v6.0 流星出现概率
+// v8.0 Liquid Glass 4.0 参数
+private const val REFRACTION_ANGLE_DEG = 20f      // v8.0 角度微调
+private const val LIQUID_FLOW_CYCLE_MS = 10000    // v8.0 更慢的流光
+private const val DEPTH_LAYERS = 5                 // v8.0 新增第五层景深
+private const val AURORA_DRIFT_CYCLE_MS = 14000    // v8.0 更慢的星轨漂移
+private const val SHOOTING_STAR_CHANCE = 0.004f   // v8.0 流星更频繁
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -185,7 +189,7 @@ fun Modifier.glassmorphismV6(
                 startY = 0f, endY = size.height
             ),
             style = Stroke(width = 1.dp.toPx()),
-            cornerRadius = CornerRadius(26f, 26f)
+            cornerRadius = CornerRadius(30f, 30f)
         )
     }
     // 第七层：Liquid玻璃边框 — v6.0 双色边缘模拟玻璃厚度
@@ -197,7 +201,7 @@ fun Modifier.glassmorphismV6(
             )
         ),
         style = Stroke(width = 0.7.dp.toPx()),
-        cornerRadius = CornerRadius(26f, 26f)
+        cornerRadius = CornerRadius((CARD_RADIUS_DP - 2).dp.toPx(), (CARD_RADIUS_DP - 2).dp.toPx())
     )
 }
 
@@ -272,15 +276,16 @@ fun Modifier.breathingGlassCardV4(
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Compose Multiplatform 共享 UI — Dashboard v7.0 "Zen绽放"
+ * Compose Multiplatform 共享 UI — Dashboard v8.0 "Astral Glow" 星光璀璨
  *
- * v7.0 升级亮点:
- *  - 情绪天气卡片 (拟天气诗意化表达: 晴天/星夜/晨曦/彩虹)
- *  - 智能日程卡片 (时段感知+情绪自适应的任务建议)
- *  - 情绪周期卡片 (峰值/谷值/周期长度/节律质量)
- *  - Liquid Glass 3.1 (微光衍射+柔焦散射)
- *  - 动态卡片色温 (基于情绪状态实时微调卡片色调)
- *  - 心情预测卡片 (v6.0保留)
+ * v8.0 升级亮点:
+ *  - 每日心情弧线卡片 (6种心情类型: 稳步上升/早鸟高峰/午后低谷/傍晚反弹/过山车/宁静水平)
+ *  - 个性化建议卡片 (基于情绪天气×周期×数据的智能建议)
+ *  - 自我对话卡片 (积极的自我认知引导)
+ *  - 里程碑庆祝卡片 (记录小胜利)
+ *  - Liquid Glass 4.0 (星尘微光+柔焦散射)
+ *  - 星轨粒子背景 (32粒子+星尘漂移+星云雾霭)
+ *  - 更舒适的视觉间距与色温系统
  */
 @Composable
 fun DashboardApp() {
@@ -301,8 +306,8 @@ fun DashboardApp() {
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Dashboard v7.0 主屏幕 — Zen绽放 · 情绪天气 + 智能日程 + 情感周期
- * v7.0: 情绪天气生态, 智能时段建议, 周期感知, 更舒适的视觉体验
+ * Dashboard v8.0 主屏幕 — Astral Glow · 星光璀璨 · 心情弧线 + 个性化建议 + 自我对话
+ * v8.0: 星轨粒子背景, 心情弧线叙事, 个性化智能建议, 自我对话, 里程碑庆祝
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -423,19 +428,27 @@ private fun DashboardScreen() {
                         StatsGridV6(smileSum = smileSum, sampleSum = sampleSum,
                             avgSmile = avgSmileVal, eyeStrain = eyeStrain)
                     } }
-                    item { AnimatedDashboardItemV6(delayMs = 150) { AuroraDataStoryCardV6(todayStats = todayStats) } }
+                    // v8.0: 心情弧线 — 一天的心情故事线
+                    item { AnimatedDashboardItemV6(delayMs = 130) { DailyMoodArcCardV8(todayStats = todayStats) } }
+                    item { AnimatedDashboardItemV6(delayMs = 170) { AuroraDataStoryCardV6(todayStats = todayStats) } }
                     item { AnimatedDashboardItemV6(delayMs = 200) { SmartSummaryCardV6(todayStats = todayStats, latestFace = latestFace) } }
                     // v7.0: 智能日程卡片 — 时段感知建议
                     item { AnimatedDashboardItemV6(delayMs = 250) { SmartScheduleCardV7(todayStats = todayStats) } }
-                    item { AnimatedDashboardItemV6(delayMs = 300) { BreathingGuideCardV6(emotionalTemp = emotionalTemperature) } }
+                    // v8.0: 个性化建议 — 基于情绪天气+周期的深度建议
+                    item { AnimatedDashboardItemV6(delayMs = 280) { PersonalizedTipsCardV8(todayStats = todayStats) } }
+                    item { AnimatedDashboardItemV6(delayMs = 310) { BreathingGuideCardV6(emotionalTemp = emotionalTemperature) } }
                     item { AnimatedDashboardItemV6(delayMs = 350) { MoodCarouselCardV6(todayStats = todayStats) } }
                     item { AnimatedDashboardItemV6(delayMs = 400) { WorkRhythmCardV6(todayStats = todayStats) } }
                     // v7.0: 情绪周期卡片 — 节律感知
                     item { AnimatedDashboardItemV6(delayMs = 450) { EmotionCycleCardV7(todayStats = todayStats) } }
-                    item { AnimatedDashboardItemV6(delayMs = 500) { InsightCardV6(todayStats = todayStats, latestFace = latestFace) } }
-                    item { AnimatedDashboardItemV6(delayMs = 550) { TrendChartSectionV6(todayStats = todayStats) } }
-                    item { AnimatedDashboardItemV6(delayMs = 600) { AmbientLightAdapterCardV6() } }
-                    item { AnimatedDashboardItemV6(delayMs = 650) { SmartSuggestionCardV6(todayStats = todayStats, latestFace = latestFace) } }
+                    // v8.0: 自我对话 — 积极的认知引导
+                    item { AnimatedDashboardItemV6(delayMs = 480) { VoiceOfSelfCardV8(todayStats = todayStats) } }
+                    // v8.0: 里程碑 — 记录小胜利
+                    item { AnimatedDashboardItemV6(delayMs = 510) { MilestoneCelebrateCardV8() } }
+                    item { AnimatedDashboardItemV6(delayMs = 540) { InsightCardV6(todayStats = todayStats, latestFace = latestFace) } }
+                    item { AnimatedDashboardItemV6(delayMs = 580) { TrendChartSectionV6(todayStats = todayStats) } }
+                    item { AnimatedDashboardItemV6(delayMs = 620) { AmbientLightAdapterCardV6() } }
+                    item { AnimatedDashboardItemV6(delayMs = 660) { SmartSuggestionCardV6(todayStats = todayStats, latestFace = latestFace) } }
                     item { AnimatedDashboardItemV6(delayMs = 700) { MoodForecastCardV6(todayStats = todayStats) } }
                     if (todayStats.isNotEmpty()) {
                         item { AnimatedDashboardItemV6(delayMs = 700) {
@@ -2413,6 +2426,338 @@ private fun CycleStatChip(label: String, value: String, color: Color) {
         Text(text = value, fontSize = 12.sp, color = color,
             fontWeight = FontWeight.Bold)
         Text(text = label, fontSize = 10.sp, color = TextMuted)
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v8.0 — Astral Glow 新卡片: 心情弧线 · 个性化建议 · 自我对话 · 里程碑
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * v8.0: 每日心情弧线卡片 — 用视觉化弧线讲述一天的心情故事
+ */
+@Composable
+private fun DailyMoodArcCardV8(todayStats: List<MinuteStat>) {
+    val snapshots = remember(todayStats) {
+        todayStats.map { stat ->
+            EmotionSnapshot(
+                timestamp = System.currentTimeMillis(),
+                smileProbability = (stat.smilePercent / 100f).coerceIn(0f, 1f),
+                dominantEmotion = if (stat.smilePercent > 60) "微笑" else if (stat.smilePercent > 30) "中性" else "疲惫",
+                dominantProb = (stat.smilePercent / 100f).coerceIn(0f, 1f),
+                eyeStrainLevel = 1f - ((stat.avgEyeLeft.coerceAtLeast(0f) + stat.avgEyeRight.coerceAtLeast(0f)) / 2f),
+                headPosture = "正视",
+                valence = (stat.smilePercent / 100f) * 2f - 1f,
+                energyLevel = stat.smilePercent.toInt(),
+                angryProbability = 0f, neutralProbability = 0f, thinkingProbability = 0f,
+                surpriseProbability = 0f, fearProbability = 0f, disgustProbability = 0f,
+                positivityIndex = stat.smilePercent.toInt(),
+                emotionTag = if (stat.smilePercent > 50) "positive" else "neutral"
+            )
+        }
+    }
+    val arc = remember(snapshots) { generateDailyMoodArc(snapshots) }
+    val arcColor = Color(arc.arcColor)
+
+    GlassCardV4(glowColor = arcColor.copy(alpha = 0.25f)) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "心情弧线", style = MaterialTheme.typography.labelMedium,
+                    color = TextMuted, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 2.dp))
+                Spacer(modifier = Modifier.weight(1f))
+                Text(text = "今日故事", fontSize = 11.sp, color = arcColor,
+                    fontWeight = FontWeight.SemiBold)
+            }
+
+            // 展示弧线类型
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = arc.icon, fontSize = 32.sp)
+                Spacer(modifier = Modifier.width(14.dp))
+                Column {
+                    Text(text = arc.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(text = arc.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary, lineHeight = 18.sp)
+                }
+            }
+
+            // 可视化弧线轨迹
+            Box(
+                modifier = Modifier.fillMaxWidth().height(48.dp)
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val w = size.width
+                    val h = size.height
+                    val barHeight = 4.dp.toPx()
+                    // 背景轨道
+                    drawRoundRect(
+                        color = Color.White.copy(alpha = 0.04f),
+                        topLeft = Offset(0f, (h - barHeight) / 2f),
+                        size = Size(w, barHeight),
+                        cornerRadius = CornerRadius(barHeight / 2)
+                    )
+                    // 弧线根据类型绘制不同轨迹点
+                    val points = when (arc.arcType) {
+                        ArcType.STEADY_RISE -> listOf(0.1f to 0.8f, 0.3f to 0.6f, 0.5f to 0.4f, 0.7f to 0.25f, 0.9f to 0.15f)
+                        ArcType.MORNING_PEAK -> listOf(0.1f to 0.3f, 0.3f to 0.15f, 0.5f to 0.35f, 0.7f to 0.5f, 0.9f to 0.6f)
+                        ArcType.AFTERNOON_DROP -> listOf(0.1f to 0.3f, 0.3f to 0.2f, 0.5f to 0.7f, 0.7f to 0.55f, 0.9f to 0.4f)
+                        ArcType.EVENING_REBOUND -> listOf(0.1f to 0.5f, 0.3f to 0.6f, 0.5f to 0.75f, 0.7f to 0.4f, 0.9f to 0.2f)
+                        ArcType.ROLLER_COASTER -> listOf(0.1f to 0.3f, 0.25f to 0.7f, 0.4f to 0.2f, 0.6f to 0.8f, 0.75f to 0.3f, 0.9f to 0.5f)
+                        ArcType.FLAT_CALM -> listOf(0.1f to 0.45f, 0.3f to 0.5f, 0.5f to 0.45f, 0.7f to 0.5f, 0.9f to 0.45f)
+                    }
+                    // 绘制连接线段
+                    for (i in 0 until points.size - 1) {
+                        val x1 = points[i].first * w
+                        val y1 = points[i].second * h
+                        val x2 = points[i + 1].first * w
+                        val y2 = points[i + 1].second * h
+                        drawLine(
+                            brush = Brush.linearGradient(
+                                colors = listOf(arcColor.copy(alpha = 0.4f), arcColor),
+                                start = Offset(x1, y1),
+                                end = Offset(x2, y2)
+                            ),
+                            start = Offset(x1, y1),
+                            end = Offset(x2, y2),
+                            strokeWidth = 3.dp.toPx(),
+                            cap = StrokeCap.Round
+                        )
+                    }
+                    points.forEach { (px, py) ->
+                        drawCircle(
+                            color = arcColor.copy(alpha = 0.6f),
+                            radius = 4.dp.toPx(),
+                            center = Offset(px * w, py * h)
+                        )
+                    }
+                }
+            }
+
+            // 高亮区域
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .background(arcColor.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
+                    .padding(10.dp)
+            ) {
+                Text(text = "💡 ", fontSize = 13.sp)
+                Text(text = arc.highlight.ifEmpty { "保持当前节奏，一切都在变好" },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary, lineHeight = 18.sp)
+            }
+        }
+    }
+}
+
+/**
+ * v8.0: 个性化建议卡片 — 基于情绪天气+周期+数据的深度建议
+ */
+@Composable
+private fun PersonalizedTipsCardV8(todayStats: List<MinuteStat>) {
+    val snapshots = remember(todayStats) {
+        todayStats.map { stat ->
+            EmotionSnapshot(
+                timestamp = System.currentTimeMillis(),
+                smileProbability = (stat.smilePercent / 100f).coerceIn(0f, 1f),
+                dominantEmotion = if (stat.smilePercent > 60) "微笑" else "中性",
+                dominantProb = (stat.smilePercent / 100f).coerceIn(0f, 1f),
+                eyeStrainLevel = 0.3f,
+                headPosture = "正视",
+                valence = (stat.smilePercent / 100f) * 2f - 1f,
+                energyLevel = stat.smilePercent.toInt(),
+                angryProbability = 0f, neutralProbability = 0f, thinkingProbability = 0f,
+                surpriseProbability = 0f, fearProbability = 0f, disgustProbability = 0f,
+                positivityIndex = stat.smilePercent.toInt(),
+                emotionTag = if (stat.smilePercent > 50) "positive" else "neutral"
+            )
+        }
+    }
+    val weather = remember(snapshots) { generateEmotionWeather(snapshots) }
+    val cycle = remember(snapshots) { analyzeEmotionCycle(snapshots) }
+    val tips = remember(snapshots, weather, cycle) { generatePersonalizedTips(snapshots, weather, cycle) }
+    val primaryTip = tips.firstOrNull()
+    val tipColor = when (primaryTip?.tipType) {
+        TipType.SELF_CARE -> AccentPink
+        TipType.PRODUCTIVITY -> AccentYellow
+        TipType.SOCIAL -> AccentGreen
+        TipType.REST -> AccentCyan
+        TipType.MINDFULNESS -> AccentPurple
+        else -> AccentIndigo
+    }
+
+    GlassCardV4(glowColor = tipColor.copy(alpha = 0.2f)) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "智慧指引", style = MaterialTheme.typography.labelMedium,
+                    color = TextMuted, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 2.dp))
+                Spacer(modifier = Modifier.weight(1f))
+                Text(text = "${tips.size}条建议", fontSize = 11.sp, color = tipColor,
+                    fontWeight = FontWeight.SemiBold)
+            }
+
+            primaryTip?.let { tip ->
+                Row(verticalAlignment = Alignment.Top) {
+                    Text(text = tip.icon, fontSize = 28.sp)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(text = tip.title,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = TextPrimary, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = tip.content,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary, lineHeight = 18.sp)
+                    }
+                }
+
+                // 建议行动
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .background(tipColor.copy(alpha = 0.07f), RoundedCornerShape(12.dp))
+                        .border(0.5.dp, tipColor.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                        .padding(12.dp)
+                ) {
+                    Text(text = "🎯 ", fontSize = 14.sp)
+                    Text(text = tip.action,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = tipColor, fontWeight = FontWeight.SemiBold,
+                        lineHeight = 18.sp)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * v8.0: 自我对话卡片 — 积极的自我认知引导
+ */
+@Composable
+private fun VoiceOfSelfCardV8(todayStats: List<MinuteStat>) {
+    val snapshots = remember(todayStats) {
+        todayStats.mapIndexed { idx, stat ->
+            EmotionSnapshot(
+                timestamp = idx.toLong() * 60_000L,
+                smileProbability = (stat.smilePercent / 100f).coerceIn(0f, 1f),
+                dominantEmotion = if (stat.smilePercent > 50) "微笑" else "中性",
+                dominantProb = stat.smilePercent / 100f,
+                eyeStrainLevel = 0.3f,
+                headPosture = "正视",
+                angryProbability = 0f, neutralProbability = 0f, thinkingProbability = 0f,
+                surpriseProbability = 0f, fearProbability = 0f, disgustProbability = 0f,
+                positivityIndex = stat.smilePercent.toInt(),
+                emotionTag = if (stat.smilePercent > 50) "positive" else "neutral"
+            )
+        }
+    }
+    val voice = remember(snapshots) { generateVoiceOfSelf(snapshots) }
+    val voiceColor = if (snapshots.size < 10) AccentIndigo
+        else {
+            val ratio = snapshots.count { it.smileProbability > 0.5f } / snapshots.size.toFloat()
+            when {
+                ratio > 0.6f -> AccentGreen
+                ratio > 0.3f -> AccentYellow
+                else -> AccentPurple
+            }
+        }
+
+    GlassCardV4(glowColor = voiceColor.copy(alpha = 0.2f)) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "内心之声", style = MaterialTheme.typography.labelMedium,
+                    color = TextMuted, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 2.dp))
+                Spacer(modifier = Modifier.weight(1f))
+                Text(text = "自我对话", fontSize = 11.sp, color = voiceColor,
+                    fontWeight = FontWeight.SemiBold)
+            }
+
+            // 反思
+            Column {
+                Text(text = voice.icon, fontSize = 28.sp)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(text = voice.reflection,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextPrimary, fontWeight = FontWeight.Medium,
+                    lineHeight = 22.sp)
+            }
+
+            // 鼓励
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .background(voiceColor.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
+                    .padding(12.dp)
+            ) {
+                Text(text = "💝 ", fontSize = 14.sp)
+                Text(text = voice.encouragement,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary, lineHeight = 18.sp)
+            }
+
+            // 每日肯定
+            Text(
+                text = voice.dailyAffirmation,
+                style = MaterialTheme.typography.bodyMedium,
+                color = voiceColor, fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+                    .background(voiceColor.copy(alpha = 0.05f), RoundedCornerShape(10.dp))
+                    .padding(10.dp)
+            )
+        }
+    }
+}
+
+/**
+ * v8.0: 里程碑庆祝卡片 — 记录小胜利
+ */
+@Composable
+private fun MilestoneCelebrateCardV8() {
+    // 模拟数据，实际应从持久化层获取
+    val totalDays = 8
+    val totalSmiles = 127
+    val currentStreak = 7
+    val milestone = remember { generateMilestone(totalDays, totalSmiles, currentStreak) }
+    val accentColor = if (milestone != null) Color(milestone.accentHex) else AccentYellow
+
+    milestone?.let { ms ->
+        GlassCardV4(glowColor = accentColor.copy(alpha = 0.3f)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = "里程碑", style = MaterialTheme.typography.labelMedium,
+                        color = TextMuted, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 2.dp))
+                    Spacer(modifier = Modifier.weight(1f))
+                    if (ms.isNew) {
+                        Surface(
+                            color = accentColor.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(0.5.dp, accentColor.copy(alpha = 0.3f))
+                        ) {
+                            Text(text = "NEW! ", modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                fontSize = 10.sp, color = accentColor, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = ms.icon, fontSize = 36.sp)
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column {
+                        Text(text = ms.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = accentColor, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = ms.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary, lineHeight = 18.sp)
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -54,32 +54,32 @@ import kotlinx.coroutines.delay
 import java.util.concurrent.TimeUnit
 
 // ═══════════════════════════════════════════════════════════════
-// v7.0 色彩系统 — Zen绽放 · 色温感知 · 柔和极光 · 5层景深
+// v8.0 色彩系统 — Astral Glow 星光璀璨 · 超低刺激 · 5层景深
 // ═══════════════════════════════════════════════════════════════
 
-private val DeepSpaceBg     = Color(0xFF020206)   // v7.0 更纯粹的黑
-private val WarmGold        = Color(0xFFFFD68A)   // v7.0 暖金色
-private val LavenderPurple  = Color(0xFFCCB0EB)   // v7.0 薰衣草
-private val AuroraGlow      = Color(0xFF7DE8B8)   // v7.0 更舒适极光绿
-private val GlassCard       = Color(0xFF0A0A12).copy(alpha = 0.88f)  // v7.0 微调
-private val GlassBorder     = Color(0xFFFFD68A).copy(alpha = 0.18f)  // v7.0 更微妙边框
-private val TextPrimary     = Color(0xFFF5F5FF)   // v7.0 纯净白
-private val TextSecondary   = Color(0xFFB0B0CC)   // v7.0 次要文字
-private val TextMuted       = Color(0xFF555570)   // v7.0
-private val AccentPink      = Color(0xFFFF9AB8)   // v7.0 更轻柔粉
-private val AccentCyan      = Color(0xFF7AE8E8)   // v7.0
-private val LiquidHighlight = Color.White.copy(alpha = 0.05f)  // v7.0 更柔和液态高光
-// v7.0 新增 — 昼夜感知色温
-private val MorningMist    = Color(0xFFB8D4E3)   // 晨雾蓝
-private val EveningRose    = Color(0xFFFFB09A)   // 暮光橙粉
-private val NightIndigo    = Color(0xFF9FA8DA)   // 夜空靛
+private val DeepSpaceBg     = Color(0xFF030308)   // v8.0 更温暖的黑
+private val WarmGold        = Color(0xFFFFE0A0)   // v8.0 更柔和暖金
+private val LavenderPurple  = Color(0xFFD8C0F0)   // v8.0 更梦幻薰衣草
+private val AuroraGlow      = Color(0xFF90F0C8)   // v8.0 星光绿
+private val GlassCard       = Color(0xFF0A0A14).copy(alpha = 0.86f)  // v8.0 更通透
+private val GlassBorder     = Color(0xFFFFE0A0).copy(alpha = 0.16f)  // v8.0 更微妙边框
+private val TextPrimary     = Color(0xFFF8F8FF)   // v8.0 更温暖的白
+private val TextSecondary   = Color(0xFFB8B8D0)   // v8.0 次要文字
+private val TextMuted       = Color(0xFF5A5A78)   // v8.0
+private val AccentPink      = Color(0xFFFFB0C8)   // v8.0 更轻柔粉
+private val AccentCyan      = Color(0xFF90E8E8)   // v8.0
+private val LiquidHighlight = Color.White.copy(alpha = 0.045f)  // v8.0 更低亮度
+// v8.0 新增 — 星辉色温系统
+private val MorningMist    = Color(0xFFD0E4F0)   // v8.0 晨雾蓝 — 更柔软
+private val EveningRose    = Color(0xFFFFC0A8)   // v8.0 暮光玫瑰 — 更温柔
+private val NightIndigo    = Color(0xFFB8C0E8)   // v8.0 夜空靛 — 更沉静
 
 // ═══════════════════════════════════════════════════════════════
-// v4.0 应用状态机
+// v8.0 应用状态机
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * v4.0 应用全局 UI 状态
+ * v8.0 应用全局 UI 状态
  * 使用 sealed class 管理屏幕切换，取代原来的 Boolean 分屏逻辑
  */
 sealed class AppUiState {
@@ -100,15 +100,15 @@ sealed class AppUiState {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MainActivity v4.0
+// MainActivity v8.0
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Android 端 MainActivity — v4.0
+ * Android 端 MainActivity — v8.0
  *
  * 核心升级:
- *  - SplashScreen v4.0: Canvas动态绘制微笑弧线Logo，流光笔触效果
- *  - OnboardingFlow v4.0: 3步引导流程 (欢迎→隐私→开始)
+ *  - SplashScreen v8.0: Canvas动态绘制微笑弧线Logo，流光笔触效果
+ *  - OnboardingFlow v8.0: 3步引导流程 (欢迎→隐私→开始)
  *  - 状态管理: sealed class AppUiState
  *  - 权限请求: 步骤化引导，拒绝后说明卡片，永久拒绝引导系统设置
  *  - 微交互: spring按压效果，slideInVertically入场，AnimatedContent切换
@@ -306,11 +306,11 @@ private fun AppContent() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// v7.0 — 极光背景 (色温感知 · 5层景深 · 柔和漂移)
+// v8.0 — 极光背景 (星辉色温 · 5层景深 · 柔和漂移)
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * v7.0: 极光缓慢流动渐变背景 — Zen绽放 版
+ * v8.0: 极光缓慢流动渐变背景 — Astral Glow 星光璀璨 版
  * 5层景深 + 昼夜色温感知: 根据时间段自动调整极光色调
  * 早晨偏冷蓝 → 正午偏暖金 → 傍晚偏橙粉 → 夜间偏靛蓝
  */
@@ -327,7 +327,7 @@ private fun AuroraBackgroundV7(alpha: Float = 1f) {
         label = "auroraProgressV7"
     )
 
-    // v7.0: 时间段色温 — 选择主色调
+    // v8.0: 时间段色温 — 选择主色调
     val primaryGlow = when {
         hour in 6..10 -> MorningMist
         hour in 11..14 -> WarmGold
@@ -357,7 +357,7 @@ private fun AuroraBackgroundV7(alpha: Float = 1f) {
         // 基础深色背景
         drawRect(color = DeepSpaceBg)
 
-        // v7.0 极光层 1 — 主色光带
+        // v8.0 极光层 1 — 主色光带
         val offset1 = (w * 0.25f * kotlin.math.sin(auroraProgress.toDouble() * kotlin.math.PI * 2)).toFloat()
         drawRect(
             brush = Brush.radialGradient(
@@ -371,7 +371,7 @@ private fun AuroraBackgroundV7(alpha: Float = 1f) {
             )
         )
 
-        // v7.0 极光层 2 — 副色光带
+        // v8.0 极光层 2 — 副色光带
         val offset2 = (w * 0.2f * kotlin.math.cos(auroraProgress.toDouble() * kotlin.math.PI * 2.0 + 1.5)).toFloat()
         drawRect(
             brush = Brush.radialGradient(
@@ -384,7 +384,7 @@ private fun AuroraBackgroundV7(alpha: Float = 1f) {
             )
         )
 
-        // v7.0 极光层 3 — 第三色光带
+        // v8.0 极光层 3 — 第三色光带
         val offset3 = (w * 0.15f * kotlin.math.sin(auroraProgress.toDouble() * kotlin.math.PI * 2.0 + 3.0)).toFloat()
         drawRect(
             brush = Brush.radialGradient(
@@ -397,7 +397,7 @@ private fun AuroraBackgroundV7(alpha: Float = 1f) {
             )
         )
 
-        // v7.0 新增极光层 4 — 顶部微光 (适配色温)
+        // v8.0 极光层 4 — 顶部微光 (适配色温)
         drawRect(
             brush = Brush.verticalGradient(
                 colors = listOf(
@@ -409,7 +409,7 @@ private fun AuroraBackgroundV7(alpha: Float = 1f) {
             )
         )
 
-        // v7.0 新增极光层 5 — 底部微光偏移带
+        // v8.0 极光层 5 — 底部微光偏移带
         val offset5 = (w * 0.1f * kotlin.math.sin(auroraProgress.toDouble() * kotlin.math.PI * 2.0 + 2.5)).toFloat()
         drawRect(
             brush = Brush.radialGradient(

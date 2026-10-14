@@ -49,45 +49,45 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 // ════════════════════════════════════════════════════════════════════════
-//  PortraitCameraScreen v7.0 — Zen绽放 · 柔和HUD + 智能色温
+//  PortraitCameraScreen v8.0 — Astral Glow · 星光璀璨 · 沉浸式HUD
 // ════════════════════════════════════════════════════════════════════════
 //
-//  v7.0 Upgrade "Zen绽放":
-//   - 色温自适应 HUD: 根据时间段(晨/午/晚)动态调整HUD色温
-//   - 柔和流光折射: liquidFlowV7 更慢的流光速度, 减少视觉疲劳
-//   - MoodWeatherIndicator: 迷你情绪天气指示器 (☀️/🌙/🌤等)
-//   - 暗色层次优化: 新增MistGray层, 卡片更柔和
-//   - 灵动中心环: 呼吸频率自适应 (检测到疲惫时变缓)
-//   - emotionColorV7: 更柔和的情绪色彩映射
+//  v8.0 Upgrade "Astral Glow" 星光璀璨:
+//   - 星辉色温系统: 更细腻的晨/午/晚/夜 四时段色温过渡
+//   - 柔和星尘流光: 降低流光亮度, 减少 OLED 刺眼感
+//   - 智能伙伴指示器: 微笑一致性追踪 + 情绪同步提示
+//   - 呼吸灯优化: 呼吸节奏更慢更深, 助放松
+//   - 情绪色环升级: 渐变过渡更平滑, 颜色更舒适
+//   - 玻璃质感提升: 更柔和的毛玻璃质感
 // ════════════════════════════════════════════════════════════════════════
 
-// ── v7.0 Zen绽放 Color Palette — 更柔和、更智能 ──
-private val ColorBackgroundDeep    = Color(0xFF020206)  // v7.0 更纯粹的黑
-private val ColorGlassPanel        = Color(0xCC0A0A12).copy(alpha = 0.82f)  // v7.0 微调
-private val ColorGlassBorderSubtle = Color.White.copy(alpha = 0.08f)  // v7.0 更微妙
-private val ColorLiveRed           = Color(0xFFFF5070)  // v7.0 更柔和的红
-private val ColorPositiveGreen     = Color(0xFF7DE8B8)  // v7.0 更舒适的绿
-private val ColorAuroraGlow        = Color(0xFF7DE8B8)  // v7.0 极光绿
-private val ColorWarningYellow     = Color(0xFFFFD68A)
-private val ColorLiquidHighlight   = Color.White.copy(alpha = 0.05f)  // v7.0 降低亮度
-private val ColorLiquidRefraction  = Color.White.copy(alpha = 0.012f)  // v7.0 更微妙
-// v7.0 新增色彩 — 晨/午/晚 色温
-private val MorningMist   = Color(0xFFB8D4E3)   // 晨雾蓝
-private val NoonGold      = Color(0xFFFFD68A)   // 正午金
-private val EveningRose   = Color(0xFFFFB09A)   // 暮光橙粉
-private val NightIndigo   = Color(0xFF9FA8DA)   // 夜空靛
-private val MistGray      = Color(0xFF1A1A24)   // v7.0 新增柔和灰
-// Aurora palette from Dashboard.kt (v7.0 微调)
-private val AuroraGreen   = Color(0xFF7DE8B8)   // 更舒适极光绿
-private val SunsetOrange  = Color(0xFFFFB07A)   // 更柔和日落橙
-private val NebulaPink    = Color(0xFFFF9AB8)   // 更轻柔星云粉
-private val CosmicViolet  = Color(0xFFB89AE8)   // 更梦幻宇宙紫
+// ── v8.0 Astral Glow Color Palette — 星光色温、超低刺激 ──
+private val ColorBackgroundDeep    = Color(0xFF030308)  // v8.0 更温暖的黑
+private val ColorGlassPanel        = Color(0xCC0C0C16).copy(alpha = 0.80f)  // v8.0 更通透
+private val ColorGlassBorderSubtle = Color.White.copy(alpha = 0.07f)  // v8.0 更微妙
+private val ColorLiveRed           = Color(0xFFFF6080)  // v8.0 更柔和的红
+private val ColorPositiveGreen     = Color(0xFF90F0C8)  // v8.0 极光绿
+private val ColorAuroraGlow        = Color(0xFF90F0C8)  // v8.0 星光绿
+private val ColorWarningYellow     = Color(0xFFFFDAAA)
+private val ColorLiquidHighlight   = Color.White.copy(alpha = 0.04f)  // v8.0 更低亮度
+private val ColorLiquidRefraction  = Color.White.copy(alpha = 0.010f)  // v8.0 更微妙
+// v8.0 晨/午/晚/夜 星辉色温
+private val MorningMist   = Color(0xFFD0E4F0)   // v8.0 晨雾蓝 — 更柔软
+private val NoonGold      = Color(0xFFFFE0A0)   // v8.0 正午金 — 更温暖
+private val EveningRose   = Color(0xFFFFC0A8)   // v8.0 暮光玫瑰 — 更温柔
+private val NightIndigo   = Color(0xFFB8C0E8)   // v8.0 夜空靛 — 更沉静
+private val MistGray      = Color(0xFF1A1A28)   // v8.0 深空灰
+// v8.0 Astral 星尘色彩
+private val AuroraGreen   = Color(0xFF90F0C8)   // 星光绿
+private val SunsetOrange  = Color(0xFFFCC090)   // 夕阳橙
+private val NebulaPink    = Color(0xFFFFB0C8)   // 星云粉
+private val CosmicViolet  = Color(0xFFC8B0F0)   // 宇宙紫
 
-// ── v7.0 Spring Configuration — gentler, more organic physics ──
-private val SpringSnappy = spring<Float>(stiffness = 85f)  // v7.0 更柔和的响应
+// ── v8.0 Spring Configuration — 更慢、更舒适 ──
+private val SpringSnappy = spring<Float>(stiffness = 80f)  // v8.0 更柔和
 private val SpringGentle = spring<Float>(stiffness = Spring.StiffnessLow)
-private val SpringBreath = spring<Float>(stiffness = Spring.StiffnessVeryLow)  // v7.0 有机呼吸
-private val SpringSoft = spring<Float>(dampingRatio = 0.75f, stiffness = 120f)  // v7.0 新增: 通用柔和弹簧
+private val SpringBreath = spring<Float>(stiffness = Spring.StiffnessVeryLow)  // v8.0 不变
+private val SpringSoft = spring<Float>(dampingRatio = 0.78f, stiffness = 115f)  // v8.0 更柔和
 
 // ── Color Constants for Emotions ──
 private val ColorSmile    = Color(0xFF4CAF50)
