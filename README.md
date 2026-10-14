@@ -268,6 +268,30 @@ iOS 端共享逻辑可以复用，Camera + MediaPipe 需要在 XCode 工程侧�
 
 ---
 
+## Version History
+
+### v8.0 "Astral Glow" 星光璀璨 — 2026-10-15
+- **色板全面升级**: Astral Glow 星辉色系 — 更柔软温暖的晨/午/晚/夜四时段色温
+- **4 张全新智能卡片**:
+  - 📈 DailyMoodArcCardV8 — Canvas 绘制的日内情绪弧线
+  - 💡 PersonalizedTipsCardV8 — 基于天气×作息的个性化建议
+  - 🪞 VoiceOfSelfCardV8 — 内心独窗（反思/鼓励/每日肯定）
+  - 🎉 MilestoneCelebrateCardV8 — 里程碑庆祝卡片
+- **视觉舒适度优化**: 降低所有色彩饱和度、增大圆角和间距、放慢动画节奏
+- **HUD 升级**: PortraitCameraScreen 色温配色升级，呼吸弹簧更柔和
+- **编译修复**: 移除 Android-only API 依赖，修复跨平台兼容性
+
+### v7.0 "Zen绽放" — 2026-10-14
+- **情绪天气系统**: EmotionWeather 8种天气状态
+- **智能日程感知**: 根据时间段自适应色温
+- **情绪周期分析**: EmotionCycleCardV7 周/月/季节分析
+- **色温感知极光**: AuroraBackgroundV7 5层景深
+
+### v6.0 "Aurora Glow" — 2026-10-13
+- Liquid Glass 3.0 液态玻璃视觉系统
+- 极光粒子背景效果
+- 心情预测功能
+
 ## Roadmap
 
 - [x] Gradle 工程 + Version Catalog
@@ -281,6 +305,7 @@ iOS 端共享逻辑可以复用，Camera + MediaPipe 需要在 XCode 工程侧�
 - [x] 智能洞察 v2.0 (压力指数 + 情绪波动率)
 - [x] 帧跳越优化 + Worker 数据清理
 - [x] SQL 索引 + 数据保留策略
+- [x] v8.0 Astral Glow 星光璀璨 — 舒适视觉与智能卡片
 - [ ] 工作日 (Mon-Fri) 09:00-18:00 自动启停
 - [ ] 每日/每周报告 (PDF 邮件发送)
 - [ ] iOS 端 AVFoundation + MediaPipe 接入
