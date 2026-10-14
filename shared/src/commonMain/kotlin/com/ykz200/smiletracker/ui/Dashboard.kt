@@ -412,7 +412,7 @@ private fun DashboardScreen() {
                     item { AnimatedDashboardItemV6(delayMs = 200) { LongTermTrendCardV6() } }
                 } else {
                     item { AnimatedDashboardItemV6(delayMs = 0) { RealTimeFaceCardV6(face = latestFace) } }
-                    // v7.0: 情绪天气卡片 — 核心新卡片，放在显著位置
+                    // v8.0: 情绪天气卡片 — 核心卡片
                     item { AnimatedDashboardItemV6(delayMs = 50) { EmotionWeatherCardV7(todayStats = todayStats) } }
                     item { AnimatedDashboardItemV6(delayMs = 100) {
                         val smileSum = todayStats.sumOf { it.smileCount.toLong() }
@@ -432,14 +432,14 @@ private fun DashboardScreen() {
                     item { AnimatedDashboardItemV6(delayMs = 130) { DailyMoodArcCardV8(todayStats = todayStats) } }
                     item { AnimatedDashboardItemV6(delayMs = 170) { AuroraDataStoryCardV6(todayStats = todayStats) } }
                     item { AnimatedDashboardItemV6(delayMs = 200) { SmartSummaryCardV6(todayStats = todayStats, latestFace = latestFace) } }
-                    // v7.0: 智能日程卡片 — 时段感知建议
+                    // v8.0: 智能日程卡片 — 时段感知建议
                     item { AnimatedDashboardItemV6(delayMs = 250) { SmartScheduleCardV7(todayStats = todayStats) } }
                     // v8.0: 个性化建议 — 基于情绪天气+周期的深度建议
                     item { AnimatedDashboardItemV6(delayMs = 280) { PersonalizedTipsCardV8(todayStats = todayStats) } }
                     item { AnimatedDashboardItemV6(delayMs = 310) { BreathingGuideCardV6(emotionalTemp = emotionalTemperature) } }
                     item { AnimatedDashboardItemV6(delayMs = 350) { MoodCarouselCardV6(todayStats = todayStats) } }
                     item { AnimatedDashboardItemV6(delayMs = 400) { WorkRhythmCardV6(todayStats = todayStats) } }
-                    // v7.0: 情绪周期卡片 — 节律感知
+                    // v8.0: 情绪周期卡片 — 节律感知
                     item { AnimatedDashboardItemV6(delayMs = 450) { EmotionCycleCardV7(todayStats = todayStats) } }
                     // v8.0: 自我对话 — 积极的认知引导
                     item { AnimatedDashboardItemV6(delayMs = 480) { VoiceOfSelfCardV8(todayStats = todayStats) } }
@@ -2128,11 +2128,11 @@ private fun lerpV4(start: Color, stop: Color, fraction: Float): Color {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// v7.0 — 情绪天气卡片 · 智能日程卡片 · 情绪周期卡片
+// v8.0 — 情绪天气卡片 · 智能日程卡片 · 情绪周期卡片
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * v7.0: 情绪天气卡片 — 用诗意化天气语言描述当前整体情绪状态
+ * v8.0: 情绪天气卡片 — 用诗意化天气语言描述当前整体情绪状态
  * 融合微笑占比/积极性/波动性/能量等级 → 拟天气表达 + 动态色温背景
  */
 @Composable
@@ -2218,7 +2218,7 @@ private fun EmotionWeatherCardV7(todayStats: List<MinuteStat>) {
 }
 
 /**
- * v7.0: 天气参数迷你仪表
+ * v8.0: 天气参数迷你仪表
  */
 @Composable
 private fun WeatherMiniGauge(
@@ -2243,7 +2243,7 @@ private fun WeatherMiniGauge(
 }
 
 /**
- * v7.0: 智能日程卡片 — 感知当前时段情绪，给出个性化日程建议
+ * v8.0: 智能日程卡片 — 感知当前时段情绪，给出个性化日程建议
  */
 @Composable
 private fun SmartScheduleCardV7(todayStats: List<MinuteStat>) {
@@ -2321,7 +2321,7 @@ private fun ScheduleAdviceRow(icon: String, text: String, color: Color) {
 }
 
 /**
- * v7.0: 情绪周期卡片 — 识别用户情绪循环节律，预测峰值谷值
+ * v8.0: 情绪周期卡片 — 识别用户情绪循环节律，预测峰值谷值
  */
 @Composable
 private fun EmotionCycleCardV7(todayStats: List<MinuteStat>) {

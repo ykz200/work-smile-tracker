@@ -321,7 +321,7 @@ private fun AuroraBackgroundV7(alpha: Float = 1f) {
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(12000, easing = LinearEasing),  // v7.0 更慢的周期
+            animation = tween(12000, easing = LinearEasing),  // v8.0 更慢的周期
             repeatMode = RepeatMode.Restart
         ),
         label = "auroraProgressV7"
@@ -424,7 +424,7 @@ private fun AuroraBackgroundV7(alpha: Float = 1f) {
     }
 }
 
-/** v7.0 AuroraBackgroundV6 兼容别名 */
+/** v8.0 AuroraBackgroundV6 兼容别名 */
 @Composable private fun AuroraBackgroundV6(alpha: Float = 1f) = AuroraBackgroundV7(alpha)
 /** v4.0 兼容别名 */
 @Composable private fun AuroraBackgroundV4(alpha: Float = 1f) = AuroraBackgroundV7(alpha)
